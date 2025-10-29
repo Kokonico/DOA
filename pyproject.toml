@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "daughterofanton"
+version = "0.1.0"
+description = ""
+authors = ["Kokonico <kokonico@duck.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.14"
+ollama = "^0.6.0"
+discord-py = "^2.6.4"
+objlog = "^3.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
