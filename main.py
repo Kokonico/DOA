@@ -3,6 +3,7 @@ import ollama_model_interface
 import chatcompletions_interface
 import constants
 import re
+import asyncio
 
 import discord
 from discord import app_commands
@@ -79,7 +80,7 @@ def main() -> None:
         # Generate response from model
         # make bot begin typing
         async with message.channel.typing():
-            anton_response = model.generate_response(temp_conv)
+            anton_response = await asyncio.to_thread(model.generate_response, temp_conv)
             # add both user message and bot response to conversation
             conversation.add_message(user_message)
             conversation.add_message(anton_response)
