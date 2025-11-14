@@ -78,7 +78,7 @@ def main() -> None:
             message.content = message.content.replace(mention_str, '@<DOA>').strip()
             # grab all mentions of any kind and strip the userid's out
             # then lookup the username for each mention and replace it
-            mention_pattern = r'@<?(\d+)>'
+            mention_pattern = r'@<(\d+)>'
             mentions = re.findall(mention_pattern, message.content)
             for mention_id in mentions:
                 user = await client.fetch_user(int(mention_id))
