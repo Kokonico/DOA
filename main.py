@@ -123,6 +123,23 @@ def main() -> None:
         while anton_response.content.startswith("Daughter of Anton: "):
             anton_response.content = anton_response.content[len("Daughter of Anton: "):].strip()
 
+        # find "@<username>" patterns and replace them with actual mentions (including the < and >)
+        mention_pattern = r'@<([^>]+)>'
+        mentions = re.findall(mention_pattern, anton_response.content)
+        for mention_name in mentions:
+            # only look in the current guild if not in DM
+            if isinstance(message.channel, discord.DMChannel):
+                user = None
+                for member in client.users:
+                    if member.name == mention_name:
+                        user = member
+                        break
+            else:
+                user = discord.utils.get(message.guild.members, name=mention_name)
+            if user:
+                mention_str = f'@<{mention_name}>'
+                anton_response.content = anton_response.content.replace(mention_str, f'<@{user.id}>').strip()
+
         # verify anton_response is under 2000 characters, if not, send multiple messages, each chain-responded (also add "..." at the end of each message except the last, as well as "..." at the beginning of each message except the first)
         # split into chunks of 2000 characters or less
         max_length = 2000
