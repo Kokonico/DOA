@@ -12,6 +12,43 @@ conversations: dict[int, classes.Conversation] = {}
 
 use_remote = constants.use_remote
 
+async def swap_mentions(content: str, client: discord.Client, message: discord.Message) -> str:
+    # find all mentions of the form <@username> into proper mention format, and proper mention format into <@username>
+    # main difference is prop. mentions are only integers, while the other form is username (alphanumeric)
+    # just find all mentions (both forms) and swap them
+    mention_pattern_generic = r'<@!?(\d+|[a-zA-Z0-9_]+)>'
+    mentions = re.findall(mention_pattern_generic, content)
+    if mentions:
+        constants.MAIN_LOG.log(constants.Debug(f'Found mentions to swap: {mentions}'))
+    for mention in mentions:
+
+        # check if it's a DOA mention, if so, replace with <@DOA>
+        if mention == str(client.user.id):
+            content = content.replace(f'<@{client.user.id}>', f'<@{client.user.name}>').strip()
+            continue
+
+        if mention.isdigit():
+            # proper mention format, swap to username
+            user = await client.fetch_user(int(mention))
+            if user:
+                mention_str = f'<@{mention}>'
+                content = content.replace(mention_str, f'<@{user.name}>').strip()
+        else:
+            # username format, swap to proper mention
+            if isinstance(message.channel, discord.DMChannel):
+                user = None
+                for member in client.users:
+                    if member.name == mention:
+                        user = member
+                        break
+            else:
+                user = discord.utils.get(message.guild.members, name=mention)
+            if user:
+                mention_str = f'<@{mention}>'
+                content = content.replace(mention_str, f'<@{user.id}>').strip()
+    return content
+
+
 def split_message(content: str, max_length: int = 2000) -> list[str]:
     if len(content) <= max_length:
         return [content]
@@ -74,17 +111,8 @@ def main() -> None:
 
         # replace the mention with username
         if not isinstance(message.channel, discord.DMChannel):
-            mention_str = f'@<{client.user.id}>'
-            message.content = message.content.replace(mention_str, '@<DOA>').strip()
-            # grab all mentions of any kind and strip the userid's out
-            # then lookup the username for each mention and replace it
-            mention_pattern = r'@<(\d+)>'
-            mentions = re.findall(mention_pattern, message.content)
-            for mention_id in mentions:
-                user = await client.fetch_user(int(mention_id))
-                if user:
-                    mention_str = f'@<{mention_id}>'
-                    message.content = message.content.replace(mention_str, f'<@{user.name}>').strip()
+            # swap mentions in message content
+            message.content = await swap_mentions(message.content, client, message)
 
         constants.reload_system_prompt()
 
@@ -124,28 +152,9 @@ def main() -> None:
         while anton_response.content.startswith("Daughter of Anton: "):
             anton_response.content = anton_response.content[len("Daughter of Anton: "):].strip()
 
-        # find all mentions of the form <@username> and replace with proper mention format
-        mention_pattern = r'@<(\w+)>'
-        mentions = re.findall(mention_pattern, anton_response.content)
-        constants.MAIN_LOG.log(constants.Debug(f'Found mentions in response: {mentions}'))
-        for mention_name in mentions:
-            # only look in the current guild if not in DM
-            if isinstance(message.channel, discord.DMChannel):
-                user = None
-                for member in client.users:
-                    if member.name == mention_name:
-                        user = member
-                        break
-            else:
-                user = discord.utils.get(message.guild.members, name=mention_name)
-            if user:
-                constants.MAIN_LOG.log(constants.Debug(f'Replacing mention {mention_name} with user ID {user.id}'))
-                mention_str = f'@<{mention_name}>'
-                anton_response.content = anton_response.content.replace(mention_str, f'@<{user.id}>').strip()
-            else:
-                constants.MAIN_LOG.log(constants.Warn(f'Could not find user for mention: {mention_name}'))
+        anton_response.content = await swap_mentions(anton_response.content, client, message)
         # verify anton_response is under 2000 characters, if not, send multiple messages, each chain-responded (also add "..." at the end of each message except the last, as well as "..." at the beginning of each message except the first)
-        # split into chunks of 2000 characters or less
+        # split into chunks of 2000 characters or fewer
         max_length = 2000
         messages = split_message(anton_response.content, max_length)
 
