@@ -24,7 +24,7 @@ REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True)
 
 
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
-REMOTE_MODEL_NAME = "google/gemini-2.5-flash"
+REMOTE_MODEL_NAME = "openai/gpt-5-mini"
 
 DISCORD_BOT_TOKEN = os.getenv("DOA_DISCORD_BOT_TOKEN", None)
 REMOTE_AUTH_API_KEY = os.getenv("DOA_REMOTE_API_KEY", None)
