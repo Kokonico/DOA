@@ -23,6 +23,8 @@ class Message:
     """A message written by a person."""
     content: str
     author: Person
+    timestamp: float
+    context: bool
 
 class AntonMessage(Message):
     """A message written by Daughter of Anton."""
@@ -39,7 +41,13 @@ class Conversation:
         self.messages = []
 
     def add_message(self, message: Message) -> None:
+        """add a message and automatically place it according to timestamp"""
         self.messages.append(message)
+        self.messages.sort(key=lambda msg: msg.timestamp)
+
+    def clear_context(self) -> None:
+        """clear all messages marked as context"""
+        self.messages = [msg for msg in self.messages if not msg.context]
 
 class Model:
     """A language model, base class for specific implementations."""

@@ -111,8 +111,27 @@ def main() -> None:
 
         # replace the mention with username
         if not isinstance(message.channel, discord.DMChannel):
-            # swap mentions in message content
-            message.content = await swap_mentions(message.content, client, message)
+            # pull context messages (past 5 messages in the channel not mentioning or involving the bot)
+            async for msg in message.channel.history(limit=10, before=message.created_at):
+                if msg.author == client.user:
+                    continue
+                if client.user in msg.mentions:
+                    continue
+                if msg == message:
+                    continue
+                # add to conversation history
+                if message.channel.id not in conversations:
+                    conversations[message.channel.id] = classes.Conversation()
+                conversation = conversations[message.channel.id]
+                user_person = classes.Person(name=msg.author.name)
+                user_message = classes.Message()
+                user_message.timestamp = msg.created_at.timestamp()
+                user_message.content = msg.content
+                user_message.context = True
+                user_message.author = user_person
+                conversation.add_message(user_message)
+        # swap mentions in message content
+        message.content = await swap_mentions(message.content, client, message)
 
         constants.reload_system_prompt()
 
@@ -130,6 +149,8 @@ def main() -> None:
         user_message = classes.Message()
         user_message.content = message.content
         user_message.author = user_person
+        user_message.timestamp = message.created_at.timestamp()
+        user_message.context = False
         temp_conv = classes.Conversation()
         temp_conv.messages = conversation.messages.copy()
         temp_conv.add_message(user_message)
@@ -162,6 +183,9 @@ def main() -> None:
         prev = message
         for content in messages:
             prev = await message.channel.send(content, reference=prev if not isinstance(message.channel, discord.DMChannel) else None)
+
+        # clear context messages
+        conversation.clear_context()
 
         constants.MAIN_LOG.log(constants.Info(f'Sent response: {anton_response.content}'))
         constants.MAIN_LOG.log(constants.Debug(f'Current conversation state: {[{"author": msg.author.name, "content": msg.content} for msg in conversation.messages]}'))
