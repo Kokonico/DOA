@@ -29,10 +29,14 @@ async def swap_mentions(content: str, client: discord.Client, message: discord.M
 
         if mention.isdigit():
             # proper mention format, swap to username
-            user = await client.fetch_user(int(mention))
-            if user:
-                mention_str = f'<@{mention}>'
-                content = content.replace(mention_str, f'<@{user.name}>').strip()
+            try:
+                user = await client.fetch_user(int(mention))
+                if user:
+                    mention_str = f'<@{mention}>'
+                    content = content.replace(mention_str, f'<@{user.name}>').strip()
+            except discord.errors.NotFound:
+                constants.MAIN_LOG.log(constants.Warn(f'User with ID {mention} not found for mention swap.'))
+                continue
         else:
             # username format, swap to proper mention
             if isinstance(message.channel, discord.DMChannel):
@@ -153,6 +157,7 @@ def main() -> None:
                         constants.MAIN_LOG.log(constants.Warn(f'Failed to fetch referenced message for context: {e}'))
                 context_person = classes.Person(name=msg.author.name)
                 context_message = classes.Message()
+                msg.content = await swap_mentions(msg.content, client, message)
                 context_message.content = msg.content
                 context_message.author = context_person
                 context_message.timestamp = msg.created_at.timestamp()
