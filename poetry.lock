@@ -690,14 +690,14 @@ files = [
 
 [[package]]
 name = "ollama"
-version = "0.6.0"
+version = "0.6.1"
 description = "The official Python client for Ollama."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "ollama-0.6.0-py3-none-any.whl", hash = "sha256:534511b3ccea2dff419ae06c3b58d7f217c55be7897c8ce5868dfb6b219cf7a0"},
-    {file = "ollama-0.6.0.tar.gz", hash = "sha256:da2b2d846b5944cfbcee1ca1e6ee0585f6c9d45a2fe9467cbcd096a37383da2f"},
+    {file = "ollama-0.6.1-py3-none-any.whl", hash = "sha256:fc4c984b345735c5486faeee67d8a265214a31cbb828167782dc642ce0a2bf8c"},
+    {file = "ollama-0.6.1.tar.gz", hash = "sha256:478c67546836430034b415ed64fa890fd3d1ff91781a9d548b3325274e69d7c6"},
 ]
 
 [package.dependencies]
@@ -989,6 +989,21 @@ files = [
 typing-extensions = ">=4.14.1"
 
 [[package]]
+name = "python-dotenv"
+version = "1.2.1"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61"},
+    {file = "python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[[package]]
 name = "sniffio"
 version = "1.3.1"
 description = "Sniff out which async library your code is running under"
@@ -1175,4 +1190,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.14"
-content-hash = "f03b29d7ef97478f967b635fb646056b5f5dbc3c2090af5154ea43dddf7b9d18"
+content-hash = "62e879ccee3b8bc8873e30bf4672b4022b5213d16e55db5e1b9ace7fa6dc510f"

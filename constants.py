@@ -3,11 +3,18 @@ import os
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
 
 from objlog import LogNode
 from objlog.LogMessages import Debug, Info, Warn, Error, Fatal
 
 use_remote = True # Set to False for local model interface
+
+# load .env file if it exists
+env_path = Path(__file__).resolve().parent / '.env'
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 LOG_FILE = "doa.log"
 
@@ -23,7 +30,7 @@ REMOTE_AUTH_API_KEY = os.getenv("DOA_REMOTE_API_KEY", None)
 
 REMOTE_SOURCE_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
 
-def reload_system_prompt() -> str:
+def reload_system_prompt() -> None:
     """Reload the system prompt's F string"""
     global SYSTEM_PROMPT
 
