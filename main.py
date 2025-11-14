@@ -44,6 +44,7 @@ def main() -> None:
     # Initialize Discord client
     intents = discord.Intents.default()
     intents.message_content = True
+    intents.members = True
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
     model = ollama_model_interface.OllamaModel(name=constants.OLLAMA_MODEL_NAME, system_prompt=None) if not use_remote else chatcompletions_interface.ChatCompletions(system_prompt=None, api_key=constants.REMOTE_AUTH_API_KEY)
@@ -124,8 +125,9 @@ def main() -> None:
             anton_response.content = anton_response.content[len("Daughter of Anton: "):].strip()
 
         # find all mentions of the form <@username> and replace with proper mention format
-        mention_pattern = r'@<([^>]+)>'
+        mention_pattern = r'<@(\w+)>'
         mentions = re.findall(mention_pattern, anton_response.content)
+        constants.MAIN_LOG.log(constants.Debug(f'Found mentions in response: {mentions}'))
         for mention_name in mentions:
             # only look in the current guild if not in DM
             if isinstance(message.channel, discord.DMChannel):
@@ -137,9 +139,11 @@ def main() -> None:
             else:
                 user = discord.utils.get(message.guild.members, name=mention_name)
             if user:
+                constants.MAIN_LOG.log(constants.Debug(f'Replacing mention {mention_name} with user ID {user.id}'))
                 mention_str = f'@<{mention_name}>'
                 anton_response.content = anton_response.content.replace(mention_str, f'<@{user.id}>').strip()
-
+            else:
+                constants.MAIN_LOG.log(constants.Warn(f'Could not find user for mention: {mention_name}'))
         # verify anton_response is under 2000 characters, if not, send multiple messages, each chain-responded (also add "..." at the end of each message except the last, as well as "..." at the beginning of each message except the first)
         # split into chunks of 2000 characters or less
         max_length = 2000
