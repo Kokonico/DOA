@@ -12,8 +12,12 @@ OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE)
 
 
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
+REMOTE_MODEL_NAME = "openai/gpt-5-mini"
 
 DISCORD_BOT_TOKEN = os.getenv("DOA_DISCORD_BOT_TOKEN", None)
+REMOTE_AUTH_API_KEY = os.getenv("DOA_REMOTE_API_KEY", None)
+
+REMOTE_SOURCE_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
 
 SYSTEM_PROMPT = f"""You are Daughter of Anton, a friendly and helpful AI assistant within the discord application.
 You respond to user messages in a conversational manner. Keep your responses concise and relevant. You receive messages in the following format:

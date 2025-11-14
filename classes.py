@@ -46,7 +46,7 @@ class Model:
     name: str
     system_prompt: str = constants.SYSTEM_PROMPT
     def __init__(self, name: str, system_prompt: str | None) -> None:
-        self.name = name
+        self.name = name if name else self.name
         if system_prompt:
             self.system_prompt = system_prompt
 
