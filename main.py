@@ -9,7 +9,7 @@ from discord import app_commands
 
 conversations: dict[int, classes.Conversation] = {}
 
-use_remote = True # Set to False for local model interface
+use_remote = constants.use_remote
 
 def main() -> None:
     # Initialize Discord client
@@ -29,7 +29,17 @@ def main() -> None:
     async def on_message(message: discord.Message):
         if message.author == client.user:
             return  # Ignore messages from the bot itself
-        if not isinstance(message.channel, discord.DMChannel) and client.user not in message.mentions and not message.reference:
+        # Only respond to messages that mention the bot in guild channels, or any message in DMs, or replies to the bot SPECIFICALLY
+        replies_to_bot = False
+        ref_message = None
+        if message.reference:
+            try:
+                ref_message = await message.channel.fetch_message(message.reference.message_id)
+                if ref_message.author == client.user:
+                    replies_to_bot = True
+            except Exception as e:
+                constants.MAIN_LOG.log(constants.Warn(f'Failed to fetch referenced message: {e}'))
+        if not isinstance(message.channel, discord.DMChannel) and client.user not in message.mentions and not replies_to_bot:
             return # Ignore messages that don't mention the bot in guild channels or reply to it
 
         # replace the mention with username
@@ -46,15 +56,10 @@ def main() -> None:
                     mention_str = f'<@{mention_id}>'
                     message.content = message.content.replace(mention_str, f'@{user.name}').strip()
 
-        if message.reference:
-            # fetch the referenced message
-            try:
-                ref_message = await message.channel.fetch_message(message.reference.message_id)
-                # prepend the content of the referenced message to the current message
-                message.content = f"(replying to: {ref_message.author.name}: {ref_message.content}) {message.content}"
-            except Exception as e:
-                constants.MAIN_LOG.log(constants.Warn(f'Failed to fetch referenced message: {e}'))
+        constants.reload_system_prompt()
 
+        if ref_message:
+                message.content = f"(replying to: {ref_message.author.name}: {ref_message.content}) {message.content}"
         # Get or create conversation for the channel
         if message.channel.id not in conversations:
             conversations[message.channel.id] = classes.Conversation()
@@ -67,12 +72,16 @@ def main() -> None:
         user_message = classes.Message()
         user_message.content = message.content
         user_message.author = user_person
-        conversation.add_message(user_message)
+        temp_conv = classes.Conversation()
+        temp_conv.messages = conversation.messages.copy()
+        temp_conv.add_message(user_message)
 
         # Generate response from model
         # make bot begin typing
         async with message.channel.typing():
-            anton_response = model.generate_response(conversation)
+            anton_response = model.generate_response(temp_conv)
+            # add both user message and bot response to conversation
+            conversation.add_message(user_message)
             conversation.add_message(anton_response)
 
         # because the AI model is stupid, sometimes it includes the username in the response, we have to strip it out (strip out all text at beginning that matches "Daughter of Anton: ")
@@ -80,8 +89,38 @@ def main() -> None:
         while anton_response.content.startswith("Daughter of Anton: "):
             anton_response.content = anton_response.content[len("Daughter of Anton: "):].strip()
 
-        # Send response back to Discord
-        await message.channel.send(anton_response.content, reference=message)
+        # verify anton_response is under 2000 characters, if not, send multiple messages, each chain-responded (also add "..." at the end of each message except the last, as well as "..." at the beginning of each message except the first)
+        # split into chunks of 2000 characters or less
+        max_length = 2000
+        messages = []
+        content = anton_response.content
+        while len(content) > max_length:
+            # remember to add 6 char buffer for "..." at end and beginning
+            # UNLESS it's the first chunk or the last chunk, then only add 3 char buffer
+            split_index = max_length
+            if len(messages) == 0:
+                split_index -= 3
+            if len(content) - split_index > max_length:
+                split_index -= 3
+            # find last space before split_index
+            last_space = content.rfind(' ', 0, split_index)
+            if last_space == -1:
+                last_space = split_index
+            chunk = content[:last_space]
+            if len(messages) > 0:
+                chunk = "..." + chunk
+            messages.append(chunk)
+            content = content[last_space:].strip()
+        if len(content) > 0:
+            if len(messages) > 0:
+                content = "..." + content
+            messages.append(content)
+
+        # Send response(s) back to Discord
+        prev = message
+        for content in messages:
+            prev = await message.channel.send(content, reference=prev)
+
         constants.MAIN_LOG.log(constants.Info(f'Sent response: {anton_response.content}'))
         constants.MAIN_LOG.log(constants.Debug(f'Current conversation state: {[{"author": msg.author.name, "content": msg.content} for msg in conversation.messages]}'))
 
