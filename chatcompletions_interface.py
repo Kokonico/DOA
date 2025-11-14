@@ -34,6 +34,8 @@ class ChatCompletions(classes.Model):
         }
 
         constants.REMOTE_LOG.log(Debug(f"Chat Completions request payload: {payload}"))
+        # remove any system messages from the debug log for readability
+        constants.REMOTE_LOG.log(Debug(f"No system prompt: {message_history}"))
         constants.REMOTE_LOG.log(Info(f"Sending request to Chat Completions API at {self.source_url}"))
         response = requests.post(self.source_url, headers=headers, json=payload, timeout=60)
         if response.status_code != 200:

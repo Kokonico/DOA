@@ -109,27 +109,6 @@ def main() -> None:
         if not isinstance(message.channel, discord.DMChannel) and client.user not in message.mentions and not replies_to_bot:
             return # Ignore messages that don't mention the bot in guild channels or reply to it
 
-        # replace the mention with username
-        if not isinstance(message.channel, discord.DMChannel):
-            # pull context messages (past 5 messages in the channel not mentioning or involving the bot)
-            async for msg in message.channel.history(limit=10, before=message.created_at):
-                if msg.author == client.user:
-                    continue
-                if client.user in msg.mentions:
-                    continue
-                if msg == message:
-                    continue
-                # add to conversation history
-                if message.channel.id not in conversations:
-                    conversations[message.channel.id] = classes.Conversation()
-                conversation = conversations[message.channel.id]
-                user_person = classes.Person(name=msg.author.name)
-                user_message = classes.Message()
-                user_message.timestamp = msg.created_at.timestamp()
-                user_message.content = msg.content
-                user_message.context = True
-                user_message.author = user_person
-                conversation.add_message(user_message)
         # swap mentions in message content
         message.content = await swap_mentions(message.content, client, message)
 
@@ -154,6 +133,31 @@ def main() -> None:
         temp_conv = classes.Conversation()
         temp_conv.messages = conversation.messages.copy()
         temp_conv.add_message(user_message)
+
+        if not isinstance(message.channel, discord.DMChannel):
+            # pull context messages (past 5 messages in the channel not mentioning or involving the bot)
+            async for msg in message.channel.history(limit=10, before=message.created_at):
+                if msg.author == client.user:
+                    continue
+                if client.user in msg.mentions:
+                    continue
+                if msg == message:
+                    continue
+                # add to conversation history
+                msg.content = await swap_mentions(msg.content, client, message)
+                if msg.reference:
+                    try:
+                        ref_msg = await message.channel.fetch_message(msg.reference.message_id)
+                        msg.content = f"(replying to: {ref_msg.author.name}: {ref_msg.content}) {msg.content}"
+                    except Exception as e:
+                        constants.MAIN_LOG.log(constants.Warn(f'Failed to fetch referenced message for context: {e}'))
+                context_person = classes.Person(name=msg.author.name)
+                context_message = classes.Message()
+                context_message.content = msg.content
+                context_message.author = context_person
+                context_message.timestamp = msg.created_at.timestamp()
+                context_message.context = True
+                temp_conv.add_message(context_message)
 
         # Generate response from model
         # make bot begin typing
@@ -182,6 +186,7 @@ def main() -> None:
         # Send response(s) back to Discord
         prev = message
         for content in messages:
+            content = "." if content == "" else content
             prev = await message.channel.send(content, reference=prev if not isinstance(message.channel, discord.DMChannel) else None)
 
         # clear context messages

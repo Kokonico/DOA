@@ -1,5 +1,6 @@
 """classes for daughter of anton"""
 import uuid
+import time
 
 import constants
 
@@ -31,6 +32,8 @@ class AntonMessage(Message):
     def __init__(self, content: str) -> None:
         super().__init__()
         self.content = content
+        self.timestamp = time.time_ns() / 1_000_000 # POSIX timestamp in milliseconds
+        self.context = False
         self.author = DaughterOfAnton()
 
 class Conversation:
