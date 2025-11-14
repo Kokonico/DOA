@@ -74,16 +74,16 @@ def main() -> None:
 
         # replace the mention with username
         if not isinstance(message.channel, discord.DMChannel):
-            mention_str = f'<@{client.user.id}>'
-            message.content = message.content.replace(mention_str, '<@DOA>').strip()
+            mention_str = f'@<{client.user.id}>'
+            message.content = message.content.replace(mention_str, '@<DOA>').strip()
             # grab all mentions of any kind and strip the userid's out
             # then lookup the username for each mention and replace it
-            mention_pattern = r'<@?(\d+)>'
+            mention_pattern = r'@<?(\d+)>'
             mentions = re.findall(mention_pattern, message.content)
             for mention_id in mentions:
                 user = await client.fetch_user(int(mention_id))
                 if user:
-                    mention_str = f'<@{mention_id}>'
+                    mention_str = f'@<{mention_id}>'
                     message.content = message.content.replace(mention_str, f'<@{user.name}>').strip()
 
         constants.reload_system_prompt()
@@ -125,7 +125,7 @@ def main() -> None:
             anton_response.content = anton_response.content[len("Daughter of Anton: "):].strip()
 
         # find all mentions of the form <@username> and replace with proper mention format
-        mention_pattern = r'<@(\w+)>'
+        mention_pattern = r'@<(\w+)>'
         mentions = re.findall(mention_pattern, anton_response.content)
         constants.MAIN_LOG.log(constants.Debug(f'Found mentions in response: {mentions}'))
         for mention_name in mentions:
@@ -141,7 +141,7 @@ def main() -> None:
             if user:
                 constants.MAIN_LOG.log(constants.Debug(f'Replacing mention {mention_name} with user ID {user.id}'))
                 mention_str = f'@<{mention_name}>'
-                anton_response.content = anton_response.content.replace(mention_str, f'<@{user.id}>').strip()
+                anton_response.content = anton_response.content.replace(mention_str, f'@<{user.id}>').strip()
             else:
                 constants.MAIN_LOG.log(constants.Warn(f'Could not find user for mention: {mention_name}'))
         # verify anton_response is under 2000 characters, if not, send multiple messages, each chain-responded (also add "..." at the end of each message except the last, as well as "..." at the beginning of each message except the first)
