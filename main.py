@@ -148,7 +148,6 @@ def main() -> None:
                 if msg == message:
                     continue
                 # add to conversation history
-                msg.content = await swap_mentions(msg.content, client, message)
                 if msg.reference:
                     try:
                         ref_msg = await message.channel.fetch_message(msg.reference.message_id)
