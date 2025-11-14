@@ -11,7 +11,7 @@ use_remote = True # Set to False for local model interface
 
 LOG_FILE = "doa.log"
 
-MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE)
+MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE, print_to_console=True)
 OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE)
 
 
