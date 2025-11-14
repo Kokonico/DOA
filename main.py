@@ -12,6 +12,34 @@ conversations: dict[int, classes.Conversation] = {}
 
 use_remote = constants.use_remote
 
+def split_message(content: str, max_length: int = 2000) -> list[str]:
+    if len(content) <= max_length:
+        return [content]
+
+    parts: list[str] = []
+    first = True
+    remaining = content
+
+    while remaining:
+        prefix = "" if first else "..."
+        # if the rest fits with the prefix, it's the last chunk
+        if len(remaining) <= max_length - len(prefix):
+            parts.append(prefix + remaining)
+            break
+
+        # reserve space for prefix and trailing "..."
+        suffix = "..."
+        body_max = max_length - len(prefix) - len(suffix)
+        # try to split at the last space within body_max
+        cut = remaining.rfind(' ', 0, body_max + 1)
+        if cut == -1:
+            cut = body_max
+        chunk_body = remaining[:cut].rstrip()
+        parts.append(prefix + chunk_body + suffix)
+        remaining = remaining[cut:].lstrip()
+        first = False
+    return parts
+
 def main() -> None:
     # Initialize Discord client
     intents = discord.Intents.default()
@@ -80,10 +108,15 @@ def main() -> None:
         # Generate response from model
         # make bot begin typing
         async with message.channel.typing():
-            anton_response = await asyncio.to_thread(model.generate_response, temp_conv)
-            # add both user message and bot response to conversation
-            conversation.add_message(user_message)
-            conversation.add_message(anton_response)
+            try:
+                anton_response = await asyncio.to_thread(model.generate_response, temp_conv)
+                # add both user message and bot response to conversation
+                conversation.add_message(user_message)
+                conversation.add_message(anton_response)
+            except Exception as e:
+                constants.MAIN_LOG.log(constants.Error(f'Error generating response: {e}'))
+                await message.channel.send("I unfortunately encountered an error while trying to respond :(", reference=message if not isinstance(message.channel, discord.DMChannel) else None)
+                return
 
         # because the AI model is stupid, sometimes it includes the username in the response, we have to strip it out (strip out all text at beginning that matches "Daughter of Anton: ")
         # keep in mind, sometimes it puts several (ex: "Daughter of Anton: Daughter of Anton: How can I help you?")
@@ -93,34 +126,12 @@ def main() -> None:
         # verify anton_response is under 2000 characters, if not, send multiple messages, each chain-responded (also add "..." at the end of each message except the last, as well as "..." at the beginning of each message except the first)
         # split into chunks of 2000 characters or less
         max_length = 2000
-        messages = []
-        content = anton_response.content
-        while len(content) > max_length:
-            # remember to add 6 char buffer for "..." at end and beginning
-            # UNLESS it's the first chunk or the last chunk, then only add 3 char buffer
-            split_index = max_length
-            if len(messages) == 0:
-                split_index -= 3
-            if len(content) - split_index > max_length:
-                split_index -= 3
-            # find last space before split_index
-            last_space = content.rfind(' ', 0, split_index)
-            if last_space == -1:
-                last_space = split_index
-            chunk = content[:last_space]
-            if len(messages) > 0:
-                chunk = "..." + chunk
-            messages.append(chunk)
-            content = content[last_space:].strip()
-        if len(content) > 0:
-            if len(messages) > 0:
-                content = "..." + content
-            messages.append(content)
+        messages = split_message(anton_response.content, max_length)
 
         # Send response(s) back to Discord
         prev = message
         for content in messages:
-            prev = await message.channel.send(content, reference=prev)
+            prev = await message.channel.send(content, reference=prev if not isinstance(message.channel, discord.DMChannel) else None)
 
         constants.MAIN_LOG.log(constants.Info(f'Sent response: {anton_response.content}'))
         constants.MAIN_LOG.log(constants.Debug(f'Current conversation state: {[{"author": msg.author.name, "content": msg.content} for msg in conversation.messages]}'))
