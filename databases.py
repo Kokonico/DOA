@@ -147,7 +147,7 @@ class DatabaseManager:
                 SELECT author, content, timestamp FROM messages
                 WHERE conversation_id = ?
                 ORDER BY timestamp ASC
-                """, (conversation_id,))
+                """, conversation_id)
                 message_rows = self.cursor.fetchall()
                 conversation = Conversation()
                 for author, content, timestamp in message_rows:
