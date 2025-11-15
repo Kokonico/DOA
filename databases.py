@@ -142,12 +142,13 @@ class DatabaseManager:
         try:
             self.cursor.execute("SELECT id FROM conversations")
             conversation_rows = self.cursor.fetchall()
-            for conversation_id in conversation_rows:
+            for result in conversation_rows:
+                conversation_id = result[0]
                 self.cursor.execute("""
                 SELECT author, content, timestamp FROM messages
                 WHERE conversation_id = ?
                 ORDER BY timestamp ASC
-                """, conversation_id)
+                """, result)
                 message_rows = self.cursor.fetchall()
                 conversation = Conversation()
                 for author, content, timestamp in message_rows:

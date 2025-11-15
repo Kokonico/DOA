@@ -1,3 +1,5 @@
+from objlog.LogMessages import Debug
+
 import classes
 import ollama_model_interface
 import chatcompletions_interface
@@ -11,7 +13,8 @@ from discord import app_commands
 
 db_manager = databases.DatabaseManager(constants.DATABASE_FILE)
 conversations: dict[int, classes.Conversation] = db_manager.load_conversations()
-# load conversations from database
+
+constants.MAIN_LOG.log(Debug(f'Loaded conversations from database: {list(conversations.keys())}'))
 
 use_remote = constants.use_remote
 
