@@ -36,6 +36,7 @@ class DatabaseManager:
         """Create necessary tables in the database. To be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement initialize_tables method.")
 
+
 class ConversationDatabaseManager(DatabaseManager):
     """
     Manages the SQLite database for Daughter of Anton.
