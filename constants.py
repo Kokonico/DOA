@@ -1,4 +1,5 @@
 """constants for daughter of anton"""
+
 import os
 import sys
 import time
@@ -9,10 +10,10 @@ from dotenv import load_dotenv
 from objlog import LogNode
 from objlog.LogMessages import Debug, Info, Warn, Error, Fatal
 
-use_remote = True # Set to False for local model interface
+use_remote = True  # Set to False for local model interface
 
 # load .env file if it exists
-env_path = Path(__file__).resolve().parent / '.env'
+env_path = Path(__file__).resolve().parent / ".env"
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
@@ -23,7 +24,6 @@ MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE, print_to_console=True)
 OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True)
 REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True)
 
-
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
 REMOTE_MODEL_NAME = "google/gemini-2.5-flash"
 
@@ -32,12 +32,19 @@ REMOTE_AUTH_API_KEY = os.getenv("DOA_REMOTE_API_KEY", None)
 
 REMOTE_SOURCE_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
 
-def reload_system_prompt() -> None:
+
+def reload_system_prompt():
     """Reload the system prompt's F string"""
     global SYSTEM_PROMPT
 
-    how_old_in_years_months_days = lambda total_days: (total_days // 365, (total_days % 365) // 30, (total_days % 365) % 30)
-    old_in_years, old_in_months, old_in_days = how_old_in_years_months_days((datetime.now() - datetime(2025, 10, 28, 1, 0)).days)
+    how_old_in_years_months_days = lambda total_days: (
+        total_days // 365,
+        (total_days % 365) // 30,
+        (total_days % 365) % 30,
+    )
+    old_in_years, old_in_months, old_in_days = how_old_in_years_months_days(
+        (datetime.now() - datetime(2025, 10, 28, 1, 0)).days
+    )
 
     # get day like "Monday, January 1, 2024"
     current_day_verbose = time.strftime("%A, %B %d, %Y", time.localtime())
@@ -94,6 +101,7 @@ def reload_system_prompt() -> None:
     - You are running on a computer running {os.name}.
     - You are running python version {sys.version}.
     """
+
 
 SYSTEM_PROMPT = ""
 reload_system_prompt()

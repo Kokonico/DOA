@@ -1,4 +1,5 @@
 """classes for daughter of anton"""
+
 import datetime
 import uuid
 import time
@@ -8,28 +9,37 @@ import constants
 
 # conversational classes
 
+
 class Person:
     """A person who wrote a message."""
+
     name: str
     id: str
+
     def __init__(self, name: str) -> None:
         self.name = name
         self.id = str(uuid.uuid4())
 
+
 class DaughterOfAnton(Person):
     """Daughter of anton's specific class."""
+
     def __init__(self) -> None:
         super().__init__(name="Daughter of Anton")
 
+
 class Message:
     """A message written by a person."""
+
     content: str
     author: Person
     timestamp: float
     context: bool
 
+
 class AntonMessage(Message):
     """A message written by Daughter of Anton."""
+
     def __init__(self, content: str) -> None:
         super().__init__()
         self.content = content
@@ -37,10 +47,12 @@ class AntonMessage(Message):
         self.context = False
         self.author = DaughterOfAnton()
 
+
 class Conversation:
     """A conversation consisting of multiple messages."""
 
     messages: list[Message]
+
     def __init__(self) -> None:
         self.messages = []
 
@@ -53,10 +65,13 @@ class Conversation:
         """clear all messages marked as context"""
         self.messages = [msg for msg in self.messages if not msg.context]
 
+
 class Model:
     """A language model, base class for specific implementations."""
+
     name: str
     system_prompt: str = constants.SYSTEM_PROMPT
+
     def __init__(self, name: str, system_prompt: str | None) -> None:
         self.name = name if name else self.name
         if system_prompt:
