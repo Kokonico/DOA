@@ -81,7 +81,7 @@ class DatabaseManager:
                 self.cursor.execute("INSERT INTO conversations (id) VALUES (?)", (channel_id,))
                 conversation_id = self.cursor.lastrowid
             # delete old messages
-            self.cursor.execute("DELETE FROM messages WHERE conversation_id = ?", (conversation_id,))
+            self.cursor.execute("DELETE FROM messages WHERE conversation_id = ?", conversation_id)
             # insert new messages
             for message in conversation.messages:
                 self.cursor.execute("""
