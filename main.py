@@ -55,6 +55,8 @@ async def swap_mentions(
             try:
                 user = await client.fetch_user(int(mention))
                 if user:
+                    # save to cache
+                    db_cache_manager.cache_user(int(mention), user.name)
                     mention_str = f"<@{mention}>"
                     content = content.replace(mention_str, f"<@{user.name}>").strip()
             except discord.errors.NotFound:
@@ -81,6 +83,8 @@ async def swap_mentions(
                     continue
                 user = discord.utils.get(message.guild.members, name=mention)
             if user:
+                # save to cache
+                db_cache_manager.cache_user(user.id, mention)
                 mention_str = f"<@{mention}>"
                 content = content.replace(mention_str, f"<@{user.id}>").strip()
     return content
