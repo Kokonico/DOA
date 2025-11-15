@@ -19,6 +19,7 @@ if env_path.exists():
 
 LOG_FILE = "doa.log"
 DATABASE_FILE = "DOA.db"
+CACHE_DATABASE_FILE = "cache.db"
 
 MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE, print_to_console=True)
 OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True)

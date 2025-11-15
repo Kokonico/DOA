@@ -11,7 +11,9 @@ import databases
 import discord
 from discord import app_commands
 
-db_manager = databases.DatabaseManager(constants.DATABASE_FILE)
+db_manager = databases.ConversationDatabaseManager(constants.DATABASE_FILE)
+db_cache_manager = databases.DiscordDataCacher(constants.CACHE_DATABASE_FILE)
+
 conversations: dict[int, classes.Conversation] = db_manager.load_conversations()
 
 constants.MAIN_LOG.log(
@@ -19,6 +21,8 @@ constants.MAIN_LOG.log(
 )
 
 use_remote = constants.use_remote
+
+commands_registered = False
 
 
 async def swap_mentions(
@@ -42,6 +46,12 @@ async def swap_mentions(
 
         if mention.isdigit():
             # proper mention format, swap to username
+            cache_lookup = db_cache_manager.get_user_by_id(int(mention))
+            if cache_lookup:
+                mention_str = f"<@{mention}>"
+                content = content.replace(mention_str, f"<@{cache_lookup}>").strip()
+                continue
+            # not in cache, fetch from discord
             try:
                 user = await client.fetch_user(int(mention))
                 if user:
@@ -63,6 +73,12 @@ async def swap_mentions(
                         user = member
                         break
             else:
+                # load from cache first
+                cache_lookup = db_cache_manager.get_user_by_id(mention)
+                if cache_lookup:
+                    mention_str = f"<@{mention}>"
+                    content = content.replace(mention_str, f"<@{cache_lookup}>").strip()
+                    continue
                 user = discord.utils.get(message.guild.members, name=mention)
             if user:
                 mention_str = f"<@{mention}>"
@@ -100,6 +116,7 @@ def split_message(content: str, max_length: int = 2000) -> list[str]:
 
 
 def main() -> None:
+    global commands_registered
     # Initialize Discord client
     intents = discord.Intents.default()
     intents.message_content = True
@@ -272,49 +289,51 @@ def main() -> None:
             )
         )
 
-    @tree.command(
-        name="induce_dementia",
-        description="Make DOA forget the conversation history for this channel.",
-    )
-    async def i_forgot(interaction: discord.Interaction):
-        if interaction.channel_id in conversations:
-            del conversations[interaction.channel_id]
-            db_manager.delete_conversation(interaction.channel_id)
-        await interaction.response.send_message(
-            "I've forgotten our conversation history. Let's start fresh!",
-            ephemeral=True,
+    if not commands_registered:
+        commands_registered = True
+        @tree.command(
+            name="induce_dementia",
+            description="Make DOA forget the conversation history for this channel.",
         )
-
-    @tree.command(
-        name="nuke_bot_messages",
-        description="Completely delete the bot's conversation history and messages for this channel.",
-    )
-    async def nuke_bot_messages(interaction: discord.Interaction):
-        # check if i have manage_messages permission in this channel
-        if isinstance(interaction.channel, discord.DMChannel):
+        async def i_forgot(interaction: discord.Interaction):
+            if interaction.channel_id in conversations:
+                del conversations[interaction.channel_id]
+                db_manager.delete_conversation(interaction.channel_id)
             await interaction.response.send_message(
-                "This command cannot be used in direct messages.", ephemeral=True
-            )
-            return
-
-        permissions = interaction.channel.permissions_for(interaction.guild.me)
-        if not permissions.manage_messages:
-            await interaction.response.send_message(
-                "I don't have permission to manage messages in this channel.",
+                "I've forgotten our conversation history. Let's start fresh!",
                 ephemeral=True,
             )
-            return
-        if interaction.channel_id in conversations:
-            del conversations[interaction.channel_id]
-            db_manager.delete_conversation(interaction.channel_id)
 
-        # Delete bot messages in the channel
-        def is_bot_message(msg: discord.Message) -> bool:
-            return msg.author == client.user
+        @tree.command(
+            name="nuke_bot_messages",
+            description="Completely delete the bot's conversation history and messages for this channel.",
+        )
+        async def nuke_bot_messages(interaction: discord.Interaction):
+            # check if i have manage_messages permission in this channel
+            if isinstance(interaction.channel, discord.DMChannel):
+                await interaction.response.send_message(
+                    "This command cannot be used in direct messages.", ephemeral=True
+                )
+                return
 
-        deleted = await interaction.channel.purge(check=is_bot_message)
-        # no confirmation message, just silently delete, it'll be obvious
-        constants.MAIN_LOG.log(constants.Info(f"Nuked {len(deleted)} bot messages"))
+            permissions = interaction.channel.permissions_for(interaction.guild.me)
+            if not permissions.manage_messages:
+                await interaction.response.send_message(
+                    "I don't have permission to manage messages in this channel.",
+                    ephemeral=True,
+                )
+                return
+            if interaction.channel_id in conversations:
+                del conversations[interaction.channel_id]
+                db_manager.delete_conversation(interaction.channel_id)
+
+            # Delete bot messages in the channel
+            def is_bot_message(msg: discord.Message) -> bool:
+                return msg.author == client.user
+
+            deleted = await interaction.channel.purge(check=is_bot_message)
+            # no confirmation message, just silently delete, it'll be obvious
+            constants.MAIN_LOG.log(constants.Info(f"Nuked {len(deleted)} bot messages"))
 
     # Run the Discord bot
     client.run(constants.DISCORD_BOT_TOKEN)

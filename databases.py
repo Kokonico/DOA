@@ -6,14 +6,10 @@ import constants
 from classes import Message, AntonMessage, Conversation, Person
 from objlog.LogMessages import Info, Error, Debug
 
-DB_FILE = "daughter_of_anton.db"
+DB_FILE = constants.DATABASE_FILE
 
 
 class DatabaseManager:
-    """
-    Manages the SQLite database for Daughter of Anton.
-    """
-
     db_path: str = DB_FILE
     connection: Connection | None = None
     cursor: Cursor | None = None
@@ -35,6 +31,15 @@ class DatabaseManager:
         except sqlite3.Error as e:
             constants.MAIN_LOG.log(Error(f"Database connection error: {e}"))
             raise e
+
+    def initialize_tables(self) -> None:
+        """Create necessary tables in the database. To be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement initialize_tables method.")
+
+class ConversationDatabaseManager(DatabaseManager):
+    """
+    Manages the SQLite database for Daughter of Anton.
+    """
 
     def initialize_tables(self) -> None:
         """Create necessary tables if they do not exist."""
@@ -254,3 +259,102 @@ class DatabaseManager:
             self.connection.close()
             constants.MAIN_LOG.log(Info("Database connection closed."))
             self.connected = False
+
+class DiscordDataCacher(DatabaseManager):
+    """
+    Manages caching of Discord data in the SQLite database.
+    """
+
+    db_path = constants.CACHE_DATABASE_FILE
+
+    connection: Connection | None = None
+    cursor: Cursor | None = None
+    connected: bool = False
+
+    def initialize_tables(self) -> None:
+        """Create necessary tables for Discord data caching."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot initialize Discord tables.")
+            )
+            return
+        try:
+            # cache ID to name mapping (or vice versa) for Discord users
+            self.cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS discord_users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+            """
+            )
+            self.connection.commit()
+            constants.MAIN_LOG.log(
+                Info("Discord data tables initialized successfully.")
+            )
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(
+                Error(f"Error initializing Discord data tables: {e}")
+            )
+            raise e
+
+    def get_user_by_id(self, user_id: int) -> str | None:
+        """Get a Discord user's name by their ID from the cache."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot get Discord user.")
+            )
+            return None
+        try:
+            self.cursor.execute(
+                "SELECT name FROM discord_users WHERE id = ?", (user_id,)
+            )
+            row = self.cursor.fetchone()
+            if row:
+                return row[0]
+            return None
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error getting Discord user: {e}"))
+            raise e
+
+    def get_user_by_name(self, user_name: str) -> int | None:
+        """Get a Discord user's ID by their name from the cache."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot get Discord user.")
+            )
+            return None
+        try:
+            self.cursor.execute(
+                "SELECT id FROM discord_users WHERE name = ?", (user_name,)
+            )
+            row = self.cursor.fetchone()
+            if row:
+                return row[0]
+            return None
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error getting Discord user: {e}"))
+            raise e
+
+    def cache_user(self, user_id: int, user_name: str) -> None:
+        """Cache a Discord user's ID and name."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot cache Discord user.")
+            )
+            return
+        try:
+            self.cursor.execute(
+                """
+            INSERT OR REPLACE INTO discord_users (id, name)
+            VALUES (?, ?)
+            """,
+                (user_id, user_name),
+            )
+            self.connection.commit()
+            constants.MAIN_LOG.log(
+                Info(f"Cached Discord user: {user_name} (ID: {user_id})")
+            )
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error caching Discord user: {e}"))
+            raise e
