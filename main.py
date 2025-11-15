@@ -4,11 +4,14 @@ import chatcompletions_interface
 import constants
 import re
 import asyncio
+import databases
 
 import discord
 from discord import app_commands
 
-conversations: dict[int, classes.Conversation] = {}
+db_manager = databases.DatabaseManager(constants.DATABASE_FILE)
+conversations: dict[int, classes.Conversation] = db_manager.load_conversations()
+# load conversations from database
 
 use_remote = constants.use_remote
 
@@ -196,6 +199,9 @@ def main() -> None:
         # clear context messages
         conversation.clear_context()
 
+        # Save conversation to database
+        db_manager.save_conversation(message.channel.id, conversation)
+
         constants.MAIN_LOG.log(constants.Info(f'Sent response: {anton_response.content}'))
         constants.MAIN_LOG.log(constants.Debug(f'Current conversation state: {[{"author": msg.author.name, "content": msg.content} for msg in conversation.messages]}'))
 
@@ -203,6 +209,7 @@ def main() -> None:
     async def i_forgot(interaction: discord.Interaction):
         if interaction.channel_id in conversations:
             del conversations[interaction.channel_id]
+            db_manager.delete_conversation(interaction.channel_id)
         await interaction.response.send_message("I've forgotten our conversation history. Let's start fresh!", ephemeral=True)
 
     @tree.command(name="nuke_bot_messages", description="Completely delete the bot's conversation history and messages for this channel.")
@@ -218,6 +225,7 @@ def main() -> None:
             return
         if interaction.channel_id in conversations:
             del conversations[interaction.channel_id]
+            db_manager.delete_conversation(interaction.channel_id)
         # Delete bot messages in the channel
         def is_bot_message(msg: discord.Message) -> bool:
             return msg.author == client.user

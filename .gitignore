@@ -359,4 +359,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-*.db # SQLite database files
+# Database files
+*.db

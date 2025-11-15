@@ -1,4 +1,5 @@
 """classes for daughter of anton"""
+import datetime
 import uuid
 import time
 
@@ -32,7 +33,7 @@ class AntonMessage(Message):
     def __init__(self, content: str) -> None:
         super().__init__()
         self.content = content
-        self.timestamp = time.time_ns() / 1_000_000 # POSIX timestamp in milliseconds
+        self.timestamp = datetime.datetime.timestamp(datetime.datetime.now())
         self.context = False
         self.author = DaughterOfAnton()
 

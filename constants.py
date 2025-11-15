@@ -17,6 +17,7 @@ if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
 LOG_FILE = "doa.log"
+DATABASE_FILE = "DOA.db"
 
 MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE, print_to_console=True)
 OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True)
