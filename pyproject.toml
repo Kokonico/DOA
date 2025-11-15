@@ -7,7 +7,7 @@ authors = ["Kokonico <kokonico@duck.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.14"
+python = "^3.13"
 ollama = "^0.6.1"
 discord-py = "^2.6.4"
 objlog = "^3.0.0"
