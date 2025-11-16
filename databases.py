@@ -229,7 +229,7 @@ class ConversationDatabaseManager(DatabaseManager):
             self.cursor.execute(
                 """
             SELECT id FROM conversations
-            WHERE channel_id = ?
+            WHERE id = ?
             """,
                 (channel_id,),
             )
