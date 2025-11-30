@@ -169,10 +169,10 @@ def main() -> None:
 
         nick = ""
 
-        if isinstance(ref_message.author, discord.Member):
-            nick = f"\\/\\{ref_message.author.nick}" if ref_message.author.nick else ""
-
         if ref_message:
+            if isinstance(ref_message.author, discord.Member):
+                nick = f"\\/\\{ref_message.author.nick}" if ref_message.author.nick else ""
+
             message.content = f"(replying to: {ref_message.author.name}{nick}: {ref_message.content}) {message.content}"
         # Get or create conversation for the channel
         conversation = db_manager.load_conversation(message.channel.id)
