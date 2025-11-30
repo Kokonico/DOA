@@ -14,12 +14,6 @@ from discord import app_commands
 db_manager = databases.ConversationDatabaseManager(constants.DATABASE_FILE)
 db_cache_manager = databases.DiscordDataCacher(constants.CACHE_DATABASE_FILE)
 
-conversations: dict[int, classes.Conversation] = db_manager.load_conversations()
-
-constants.MAIN_LOG.log(
-    Debug(f"Loaded conversations from database: {list(conversations.keys())}")
-)
-
 use_remote = constants.use_remote
 
 commands_registered = False
@@ -176,9 +170,7 @@ def main() -> None:
         if ref_message:
             message.content = f"(replying to: {ref_message.author.name}: {ref_message.content}) {message.content}"
         # Get or create conversation for the channel
-        if message.channel.id not in conversations:
-            conversations[message.channel.id] = classes.Conversation()
-        conversation = conversations[message.channel.id]
+        conversation = db_manager.load_conversation(message.channel.id)
 
         constants.MAIN_LOG.log(
             constants.Info(f"Received message from {message.author}: {message.content}")
@@ -300,9 +292,7 @@ def main() -> None:
             description="Make DOA forget the conversation history for this channel.",
         )
         async def i_forgot(interaction: discord.Interaction):
-            if interaction.channel_id in conversations:
-                del conversations[interaction.channel_id]
-                db_manager.delete_conversation(interaction.channel_id)
+            db_manager.delete_conversation(interaction.channel_id)
             await interaction.response.send_message(
                 "I've forgotten our conversation history. Let's start fresh!",
                 ephemeral=True,
@@ -327,9 +317,7 @@ def main() -> None:
                     ephemeral=True,
                 )
                 return
-            if interaction.channel_id in conversations:
-                del conversations[interaction.channel_id]
-                db_manager.delete_conversation(interaction.channel_id)
+            db_manager.delete_conversation(interaction.channel_id)
 
             # Delete bot messages in the channel
             def is_bot_message(msg: discord.Message) -> bool:
