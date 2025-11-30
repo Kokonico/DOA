@@ -169,9 +169,21 @@ def main() -> None:
 
         nick = ""
 
+        guild: discord.Guild = message.guild
+        author = message.author
+        if guild:
+            member = guild.get_member(author.id)
+            if member and member.nick:
+                nick = f"\\/\\{member.nick}"
+
         if ref_message:
-            if isinstance(ref_message.author, discord.Member):
-                nick = f"\\/\\{ref_message.author.nick}" if ref_message.author.nick else ""
+
+            ref_author = ref_message.author
+            nick = ""
+            if guild:
+                ref_member = guild.get_member(ref_author.id)
+                if ref_member and ref_member.nick:
+                    nick = f"\\/\\{ref_member.nick}"
 
             message.content = f"(replying to: {ref_message.author.name}{nick}: {ref_message.content}) {message.content}"
         # Get or create conversation for the channel
@@ -182,10 +194,7 @@ def main() -> None:
         )
 
         # Add user message to conversation
-        if isinstance(message.author, discord.Member):
-            nick = f"{message.author.nick}" if message.author.nick else ""
-
-        user_person = classes.Person(name=message.author.name, nick=nick)
+        user_person = classes.Person(name=message.author.name, nick=nick if nick and nick != "" else None)
         user_message = classes.Message()
         user_message.content = message.content
         user_message.author = user_person
@@ -213,12 +222,10 @@ def main() -> None:
                             msg.reference.message_id
                         )
                         nick = ""
-                        if isinstance(ref_msg.author, discord.Member):
-                            nick = (
-                                f"\\/\\{ref_msg.author.nick}"
-                                if ref_msg.author.nick
-                                else ""
-                            )
+                        if guild:
+                            ref_member = guild.get_member(ref_msg.author.id)
+                            if ref_member and ref_member.nick:
+                                nick = f"\\/\\{ref_member.nick}"
                         msg.content = f"(replying to: {ref_msg.author.name}{nick}: {ref_msg.content}) {msg.content}"
                     except Exception as e:
                         constants.MAIN_LOG.log(
