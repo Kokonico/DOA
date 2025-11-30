@@ -15,9 +15,11 @@ class Person:
 
     name: str
     id: str
+    nick: str | None = None
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, nick: str | None = None) -> None:
         self.name = name
+        self.nick = nick
         self.id = str(uuid.uuid4())
 
 

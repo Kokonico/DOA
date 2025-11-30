@@ -167,8 +167,13 @@ def main() -> None:
 
         constants.reload_system_prompt()
 
+        nick = ""
+
+        if isinstance(ref_message.author, discord.Member):
+            nick = f"\\/\\{ref_message.author.nick}" if ref_message.author.nick else ""
+
         if ref_message:
-            message.content = f"(replying to: {ref_message.author.name}: {ref_message.content}) {message.content}"
+            message.content = f"(replying to: {ref_message.author.name}{nick}: {ref_message.content}) {message.content}"
         # Get or create conversation for the channel
         conversation = db_manager.load_conversation(message.channel.id)
 
@@ -177,7 +182,10 @@ def main() -> None:
         )
 
         # Add user message to conversation
-        user_person = classes.Person(name=message.author.name)
+        if isinstance(message.author, discord.Member):
+            nick = f"{message.author.nick}" if message.author.nick else ""
+
+        user_person = classes.Person(name=message.author.name, nick=nick)
         user_message = classes.Message()
         user_message.content = message.content
         user_message.author = user_person
@@ -204,7 +212,14 @@ def main() -> None:
                         ref_msg = await message.channel.fetch_message(
                             msg.reference.message_id
                         )
-                        msg.content = f"(replying to: {ref_msg.author.name}: {ref_msg.content}) {msg.content}"
+                        nick = ""
+                        if isinstance(ref_msg.author, discord.Member):
+                            nick = (
+                                f"\\/\\{ref_msg.author.nick}"
+                                if ref_msg.author.nick
+                                else ""
+                            )
+                        msg.content = f"(replying to: {ref_msg.author.name}{nick}: {ref_msg.content}) {msg.content}"
                     except Exception as e:
                         constants.MAIN_LOG.log(
                             constants.Warn(
