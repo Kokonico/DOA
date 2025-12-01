@@ -22,9 +22,8 @@ class OllamaModel(classes.Model):
         message_history = []
         for message in conversation.messages:
             role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
-            nick = f"\\/\\{message.author.nick}" if message.author.nick else ""
             message_history.append(
-                {"role": role, "content": f"{message.author.name}{nick}: {message.content}"}
+                {"role": role, "content": str(message)}
             )
 
         response = client.chat(
