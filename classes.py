@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """classes for daughter of anton"""
 
 import datetime
@@ -6,6 +7,7 @@ import uuid
 import time
 
 import constants
+
 
 # conversational classes
 
@@ -28,6 +30,7 @@ class DaughterOfAnton(Person):
     def __init__(self) -> None:
         super().__init__(name="Daughter of Anton")
 
+
 # attachments
 
 class Attachment:
@@ -35,9 +38,11 @@ class Attachment:
 
     filename: str
     data: bytes
+
     def __init__(self, filename: str, data: bytes) -> None:
         self.filename = filename
         self.data = data
+
 
 class ImageAttachment(Attachment):
     """An image attachment to a message."""
@@ -48,25 +53,30 @@ class ImageAttachment(Attachment):
         super().__init__(filename, data)
         self.url = url
 
+
 class VideoAttachment(Attachment):
     """A video attachment to a message."""
 
     def __init__(self, filename: str, data: bytes) -> None:
         super().__init__(filename, data)
 
+
 class TextAttachment(Attachment):
     """A text attachment to a message."""
 
     mime: str
+
     def __init__(self, filename: str, data: bytes, mime: str = "text/plain") -> None:
         super().__init__(filename, data)
         self.mime = mime
+
 
 class AudioAttachment(Attachment):
     """An audio attachment to a message."""
 
     def __init__(self, filename: str, data: bytes) -> None:
         super().__init__(filename, data)
+
 
 class Message:
     """A message written by a person."""
@@ -79,25 +89,29 @@ class Message:
     attachments: list[Attachment] = []
     uuid: str
 
-    def __init__(self, content: str = "", author: Person | None = None, context: bool = False, reference: Message | None = None) -> None:
+    def __init__(self, content: str = "", author: Person | None = None, context: bool = False,
+                 reference: Message | None = None) -> None:
         self.content = content
         self.author = author if author else Person(name="Unknown")
         self.timestamp = datetime.datetime.timestamp(datetime.datetime.now())
         self.context = context
         self.reference = reference
         self.uuid = str(uuid.uuid4())
-        self.attachments = [] # initialize attachments as empty list (prevent shared mutable default,
+        self.attachments = []  # initialize attachments as empty list (prevent shared mutable default,
         # i'm so stupid for not catching this earlier)
 
     def string_no_reply(self):
         nick = f"\\/\\{self.author.nick}" if self.author.nick else ""
-        return f"{self.author.name}{nick}: {self.content} " + "".join([f" [Attachment (type: {type(attachment).__name__}, filename: {attachment.filename})]" for attachment in self.attachments])
+        return f"{self.author.name}{nick}: {self.content} " + "".join(
+            [f" [Attachment (type: {type(attachment).__name__}, filename: {attachment.filename})]" for attachment in
+             self.attachments])
 
     def __repr__(self):
         return f"<Message author={self.author.name} timestamp={self.timestamp} context={self.context} content={self.content}>"
 
     def __str__(self):
-        return (f"(replying to: {self.reference.string_no_reply()}) " if self.reference else "") + self.string_no_reply()
+        return (
+            f"(replying to: {self.reference.string_no_reply()}) " if self.reference else "") + self.string_no_reply()
 
 
 class AntonMessage(Message):
