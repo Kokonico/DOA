@@ -94,6 +94,9 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
         member = guild.get_member(author.id)
         if member and member.nick:
             nick = member.nick
+    if not nick:
+        # check universal discord nickname
+        nick = author.display_name
     person = classes.Person(name=message.author.name, nick=nick if nick and nick != "" else None)
     msg = classes.Message()
     msg.content = await swap_mentions(message.content, client, message)

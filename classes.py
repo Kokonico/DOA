@@ -6,9 +6,7 @@ import time
 
 import constants
 
-
 # conversational classes
-
 
 class Person:
     """A person who wrote a message."""
@@ -29,6 +27,42 @@ class DaughterOfAnton(Person):
     def __init__(self) -> None:
         super().__init__(name="Daughter of Anton")
 
+# attachments
+
+class Attachment:
+    """An attachment to a message."""
+
+    filename: str
+    data: bytes
+    def __init__(self, filename: str, data: bytes) -> None:
+        self.filename = filename
+        self.data = data
+
+class ImageAttachment(Attachment):
+    """An image attachment to a message."""
+
+    def __init__(self, filename: str, data: bytes) -> None:
+        super().__init__(filename, data)
+
+class VideoAttachment(Attachment):
+    """A video attachment to a message."""
+
+    def __init__(self, filename: str, data: bytes) -> None:
+        super().__init__(filename, data)
+
+class TextAttachment(Attachment):
+    """A text attachment to a message."""
+
+    mime: str
+    def __init__(self, filename: str, data: bytes, mime: str = "text/plain") -> None:
+        super().__init__(filename, data)
+        self.mime = mime
+
+class AudioAttachment(Attachment):
+    """An audio attachment to a message."""
+
+    def __init__(self, filename: str, data: bytes) -> None:
+        super().__init__(filename, data)
 
 class Message:
     """A message written by a person."""
@@ -38,6 +72,7 @@ class Message:
     timestamp: float
     context: bool
     reference: Message | None = None
+    attachments: list[Attachment] = []
     uuid: str
 
     def __init__(self, content: str = "", author: Person | None = None, context: bool = False, reference: Message | None = None) -> None:
