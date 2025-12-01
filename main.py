@@ -183,8 +183,6 @@ def main() -> None:
         # swap mentions in message content
         message.content = await swap_mentions(message.content, client, message)
 
-        constants.reload_system_prompt()
-
         if ref_message:
 
             ref_message: classes.Message = await convert_message(ref_message, client, is_context=False)
@@ -235,6 +233,7 @@ def main() -> None:
         # make bot begin typing
         async with message.channel.typing():
             try:
+                constants.reload_system_prompt()
                 anton_response = await asyncio.to_thread(
                     model.generate_response, temp_conv
                 )
