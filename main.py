@@ -11,13 +11,14 @@ import databases
 import discord
 from discord import app_commands
 
+from classes import Message
+
 db_manager = databases.ConversationDatabaseManager(constants.DATABASE_FILE)
 db_cache_manager = databases.DiscordDataCacher(constants.CACHE_DATABASE_FILE)
 
 use_remote = constants.use_remote
 
 commands_registered = False
-
 
 async def swap_mentions(
     content: str, client: discord.Client, message: discord.Message
@@ -83,6 +84,23 @@ async def swap_mentions(
                 content = content.replace(mention_str, f"<@{user.id}>").strip()
     return content
 
+async def convert_message(message: discord.Message, client: discord.Client, is_context: bool) -> Message:
+    # convert a discord message to our Message class
+    # get nick if applicable
+    nick = ""
+    guild: discord.Guild = message.guild
+    author = message.author
+    if guild:
+        member = guild.get_member(author.id)
+        if member and member.nick:
+            nick = member.nick
+    person = classes.Person(name=message.author.name, nick=nick if nick and nick != "" else None)
+    msg = classes.Message()
+    msg.content = await swap_mentions(message.content, client, message)
+    msg.author = person
+    msg.timestamp = message.created_at.timestamp()
+    msg.context = is_context
+    return msg
 
 def split_message(content: str, max_length: int = 2000) -> list[str]:
     if len(content) <= max_length:
@@ -167,25 +185,9 @@ def main() -> None:
 
         constants.reload_system_prompt()
 
-        nick = ""
-
-        guild: discord.Guild = message.guild
-        author = message.author
-        if guild:
-            member = guild.get_member(author.id)
-            if member and member.nick:
-                nick = f"\\/\\{member.nick}"
-
         if ref_message:
 
-            ref_author = ref_message.author
-            nick = ""
-            if guild:
-                ref_member = guild.get_member(ref_author.id)
-                if ref_member and ref_member.nick:
-                    nick = f"\\/\\{ref_member.nick}"
-
-            message.content = f"(replying to: {ref_message.author.name}{nick}: {ref_message.content}) {message.content}"
+            ref_message: classes.Message = await convert_message(ref_message, client, is_context=False)
         # Get or create conversation for the channel
         conversation = db_manager.load_conversation(message.channel.id)
 
@@ -194,12 +196,8 @@ def main() -> None:
         )
 
         # Add user message to conversation
-        user_person = classes.Person(name=message.author.name, nick=nick if nick and nick != "" else None)
-        user_message = classes.Message()
-        user_message.content = message.content
-        user_message.author = user_person
-        user_message.timestamp = message.created_at.timestamp()
-        user_message.context = False
+        user_message = await convert_message(message, client, is_context=False)
+        user_message.reference = ref_message
         temp_conv = classes.Conversation()
         temp_conv.messages = conversation.messages.copy()
         temp_conv.add_message(user_message)
@@ -216,30 +214,21 @@ def main() -> None:
                 if msg == message:
                     continue
                 # add to conversation history
+                context_ref_message = None
                 if msg.reference:
                     try:
                         ref_msg = await message.channel.fetch_message(
                             msg.reference.message_id
                         )
-                        nick = ""
-                        if guild:
-                            ref_member = guild.get_member(ref_msg.author.id)
-                            if ref_member and ref_member.nick:
-                                nick = f"\\/\\{ref_member.nick}"
-                        msg.content = f"(replying to: {ref_msg.author.name}{nick}: {ref_msg.content}) {msg.content}"
+                        context_ref_message = await convert_message(ref_msg, client, is_context=True)
                     except Exception as e:
                         constants.MAIN_LOG.log(
                             constants.Warn(
                                 f"Failed to fetch referenced message for context: {e}"
                             )
                         )
-                context_person = classes.Person(name=msg.author.name)
-                context_message = classes.Message()
-                msg.content = await swap_mentions(msg.content, client, message)
-                context_message.content = msg.content
-                context_message.author = context_person
-                context_message.timestamp = msg.created_at.timestamp()
-                context_message.context = True
+                context_message = await convert_message(msg, client, is_context=True)
+                context_message.reference = context_ref_message
                 temp_conv.add_message(context_message)
 
         # Generate response from model

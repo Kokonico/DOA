@@ -46,7 +46,7 @@ class ConversationDatabaseManager(DatabaseManager):
         """Create necessary tables if they do not exist."""
         # how conversations work:
         # each conversation has a bunch of messages and a channel id (use the channel ID as the conversation ID)
-        # each message has an author and content
+        # each message has an author, nick, uuid, reply_to and content
         if not self.connected:
             constants.MAIN_LOG.log(
                 Error("Database not connected. Cannot initialize tables.")
@@ -61,14 +61,19 @@ class ConversationDatabaseManager(DatabaseManager):
             """
             )
             # note: don't worry about context bool, no context messages will be saved.
+            # also add key | none to "reply to" message ID later if needed
             self.cursor.execute(
                 """
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 conversation_id INTEGER,
                 author TEXT NOT NULL,
+                nick TEXT,
+                reply_to INTEGER,
                 content TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
+                uuid TEXT NOT NULL,
+                UNIQUE (uuid) ON CONFLICT REPLACE,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
             """
@@ -77,6 +82,86 @@ class ConversationDatabaseManager(DatabaseManager):
             constants.MAIN_LOG.log(Info("Database tables initialized successfully."))
         except sqlite3.Error as e:
             constants.MAIN_LOG.log(Error(f"Error initializing database tables: {e}"))
+            raise e
+
+    def resolve_replies(self, initial_id: int) -> Message:
+        # Retrieve a message and its reply chain from the database by its ID.
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot retrieve message.")
+            )
+            return None
+        try:
+            self.cursor.execute(
+                """
+            SELECT author, nick, content, timestamp, reply_to, uuid FROM messages
+            WHERE id = ?
+            """,
+                (initial_id,),
+            )
+            row = self.cursor.fetchone()
+            if row:
+                next_to_retrieve = row[4]
+                result = Message(row[2], author=Person(name=row[0], nick=row[1]), context=False)
+                result.uuid = row[5]
+                result.timestamp = row[3]
+                while next_to_retrieve:
+                    self.cursor.execute(
+                        """
+                    SELECT author, nick, content, timestamp, reply_to, uuid FROM messages
+                    WHERE id = ?
+                    """,
+                        (next_to_retrieve,),
+                    )
+                    reply_row = self.cursor.fetchone()
+                    if reply_row:
+                        reply_message = Message(reply_row[2], author=Person(name=reply_row[0], nick=reply_row[1]), context=False)
+                        reply_message.uuid = reply_row[5]
+                        reply_message.timestamp = reply_row[3]
+                        result.reference = reply_message
+                        next_to_retrieve = reply_row[4]
+                    else:
+                        break
+                return result
+            return None
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error retrieving message by ID: {e}"))
+            raise e
+
+    def get_id_from_uuid(self, uuid: str) -> int | None:
+        """Retrieve a message ID from the database by its UUID."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot retrieve message ID.")
+            )
+            return None
+        try:
+            self.cursor.execute(
+                """
+            SELECT id FROM messages
+            WHERE uuid = ?
+            """,
+                (uuid,),
+            )
+            row = self.cursor.fetchone()
+            if row:
+                return row[0]
+            return None
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error retrieving message ID by UUID: {e}"))
+            raise e
+
+    def get_message_from_uuid(self, uuid: str) -> Message | None:
+        """Retrieve a message from the database by its UUID."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot retrieve message.")
+            )
+            return None
+        try:
+            return self.resolve_replies(self.get_id_from_uuid(uuid))
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error retrieving message by UUID: {e}"))
             raise e
 
     def save_conversation(self, channel_id: int, conversation: Conversation) -> None:
@@ -111,14 +196,17 @@ class ConversationDatabaseManager(DatabaseManager):
             for message in conversation.messages:
                 self.cursor.execute(
                     """
-                INSERT INTO messages (conversation_id, author, content, timestamp)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO messages (conversation_id, author, nick, reply_to, content, timestamp, uuid)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         conversation_id,
                         message.author.name,
+                        message.author.nick,
+                        self.get_id_from_uuid(message.reference.uuid) if message.reference else None,
                         message.content,
                         int(message.timestamp),
+                        message.uuid
                     ),
                 )
             self.connection.commit()
@@ -152,23 +240,17 @@ class ConversationDatabaseManager(DatabaseManager):
             conversation_id = row[0]
             self.cursor.execute(
                 """
-            SELECT author, content, timestamp FROM messages
+            SELECT id FROM messages
             WHERE conversation_id = ?
             ORDER BY timestamp ASC
             """,
                 (conversation_id,),
             )
-            rows = self.cursor.fetchall()
+            message_rows = self.cursor.fetchall()
             conversation = Conversation()
-            for author, content, timestamp in rows:
-                if author == "Daughter of Anton":
-                    message = AntonMessage(content=content)
-                else:
-                    message = Message()
-                    message.content = content
-                    message.author = Person(name=author)
-                    message.timestamp = timestamp
-                    message.context = False
+            for (message_id,) in message_rows:
+                # resolve replies
+                message = self.resolve_replies(message_id)
                 conversation.add_message(message)
             constants.MAIN_LOG.log(
                 Info(f"Conversation loaded for channel {channel_id}")
@@ -193,23 +275,25 @@ class ConversationDatabaseManager(DatabaseManager):
                 conversation_id = result[0]
                 self.cursor.execute(
                     """
-                SELECT author, content, timestamp FROM messages
-                WHERE conversation_id = ?
-                ORDER BY timestamp ASC
-                """,
+                    SELECT author, content, timestamp, nick, reply_to, uuid
+                    FROM messages
+                    WHERE conversation_id = ?
+                    ORDER BY timestamp
+                    """,
                     result,
                 )
                 message_rows = self.cursor.fetchall()
                 conversation = Conversation()
-                for author, content, timestamp in message_rows:
+                for author, content, timestamp, nick, reply_to, uuid in message_rows:
                     if author == "Daughter of Anton":
                         message = AntonMessage(content=content)
                     else:
-                        message = Message()
-                        message.content = content
-                        message.author = Person(name=author)
-                        message.timestamp = timestamp
-                        message.context = False
+                        message = Message(content=content, author=Person(name=author, nick=nick))
+
+                    if reply_to:
+                        message.reference = self.resolve_replies(reply_to)
+                    message.timestamp = timestamp
+                    message.uuid = uuid # ensure UUID is set to the database value
                     conversation.add_message(message)
                 conversations_dict[conversation_id] = conversation
             constants.MAIN_LOG.log(Info("All conversations loaded from database."))

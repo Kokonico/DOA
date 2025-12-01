@@ -37,6 +37,26 @@ class Message:
     author: Person
     timestamp: float
     context: bool
+    reference: Message | None = None
+    uuid: str
+
+    def __init__(self, content: str = "", author: Person | None = None, context: bool = False, reference: Message | None = None) -> None:
+        self.content = content
+        self.author = author if author else Person(name="Unknown")
+        self.timestamp = datetime.datetime.timestamp(datetime.datetime.now())
+        self.context = context
+        self.reference = reference
+        self.uuid = str(uuid.uuid4())
+
+    def string_no_reply(self):
+        nick = f"\\/\\{self.author.nick}" if self.author.nick else ""
+        return f"{self.author.name}{nick}: {self.content}"
+
+    def __repr__(self):
+        return f"<Message author={self.author.name} timestamp={self.timestamp} context={self.context} content={self.content}>"
+
+    def __str__(self):
+        return (f"(replying to: {self.reference.string_no_reply()}) " if self.reference else "") + self.string_no_reply()
 
 
 class AntonMessage(Message):
