@@ -233,7 +233,6 @@ def main() -> None:
         # make bot begin typing
         async with message.channel.typing():
             try:
-                constants.reload_system_prompt()
                 anton_response = await asyncio.to_thread(
                     model.generate_response, temp_conv
                 )

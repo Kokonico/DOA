@@ -92,7 +92,6 @@ class Model:
     """A language model, base class for specific implementations."""
 
     name: str
-    system_prompt: str = constants.SYSTEM_PROMPT
 
     def __init__(self, name: str, system_prompt: str | None) -> None:
         self.name = name if name else self.name

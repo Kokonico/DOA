@@ -28,7 +28,7 @@ class OllamaModel(classes.Model):
 
         response = client.chat(
             model=self.name,
-            messages=[{"role": "system", "content": self.system_prompt}]
+            messages=[{"role": "system", "content": constants.system_prompt()}]
             + message_history,
         )
         constants.OLLAMA_LOG.log(Info("Received response from Ollama model."))

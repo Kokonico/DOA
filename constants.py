@@ -36,9 +36,8 @@ REMOTE_SOURCE_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
 BOOTUP_TIME = datetime.now()
 
 
-def reload_system_prompt():
-    """Reload the system prompt's F string"""
-    global SYSTEM_PROMPT
+def system_prompt():
+    """Generate the system prompt with dynamic data."""
 
     how_old_in_years_months_days = lambda total_days: (
         total_days // 365,
@@ -115,10 +114,9 @@ def reload_system_prompt():
     - You are running on a computer running {os.name}.
     - You are running python version {sys.version}.
     """
-
-
-SYSTEM_PROMPT = ""
-reload_system_prompt()
+    MAIN_LOG.log(Debug("System prompt reloaded."))
+    MAIN_LOG.log(Debug(f"Uptime: {uptime_hours}h {uptime_minutes}m {uptime_seconds}s"))
+    return SYSTEM_PROMPT
 
 # check for uninitialized env vars
 if not DISCORD_BOT_TOKEN:

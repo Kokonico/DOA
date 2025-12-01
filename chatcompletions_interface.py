@@ -44,7 +44,7 @@ class ChatCompletions(classes.Model):
 
         payload = {
             "model": self.name,
-            "messages": [{"role": "system", "content": self.system_prompt}]
+            "messages": [{"role": "system", "content": constants.system_prompt()}]
             + message_history,
         }
 
