@@ -1,3 +1,4 @@
+from __future__ import annotations
 """classes for daughter of anton"""
 
 import datetime
