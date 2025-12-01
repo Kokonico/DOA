@@ -43,7 +43,7 @@ class ChatCompletions(classes.Model):
 
                 if type:
                     message_to_add["content"].append(
-                        {"type": type, ("text" if type == "text" else "image_url"): ({"url": attachment.url} if type == "image_url" else attachment.content)}
+                        {"type": type, ("text" if type == "text" else "image_url"): ({"url": attachment.url} if type == "image_url" else attachment.data.decode('utf-8'))}
                     )
 
             message_history.append(message_to_add)

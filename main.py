@@ -145,7 +145,6 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
                     filename=attachment.filename, data=data
                 )
                 msg.attachments.append(text_attachment)
-            message.content += f" [Attachment (type: {attachment.content_type or 'unknown'}): {attachment.filename}]"
         except Exception as e:
             constants.MAIN_LOG.log(
                 constants.Warn(f"Failed to read attachment {attachment.filename}: {e}")

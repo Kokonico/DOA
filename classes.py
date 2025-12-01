@@ -88,7 +88,7 @@ class Message:
 
     def string_no_reply(self):
         nick = f"\\/\\{self.author.nick}" if self.author.nick else ""
-        return f"{self.author.name}{nick}: {self.content}"
+        return f"{self.author.name}{nick}: {self.content} " + "".join([f" [Attachment (type: {type(attachment).__name__}, filename: {attachment.filename})]" for attachment in self.attachments])
 
     def __repr__(self):
         return f"<Message author={self.author.name} timestamp={self.timestamp} context={self.context} content={self.content}>"
