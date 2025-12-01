@@ -11,7 +11,7 @@ import databases
 import discord
 from discord import app_commands
 
-from classes import Message
+from classes import Message, AudioAttachment, TextAttachment, VideoAttachment, ImageAttachment
 
 db_manager = databases.ConversationDatabaseManager(constants.DATABASE_FILE)
 db_cache_manager = databases.DiscordDataCacher(constants.CACHE_DATABASE_FILE)
@@ -103,6 +103,54 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
     msg.author = person
     msg.timestamp = message.created_at.timestamp()
     msg.context = is_context
+
+    # pull attachments
+    for attachment in message.attachments:
+        try:
+            data = await attachment.read()
+            if attachment.content_type:
+                if attachment.content_type.startswith("image/"):
+                    img_attachment = ImageAttachment(
+                        filename=attachment.filename, data=data, url=attachment.url
+                    )
+                    msg.attachments.append(img_attachment)
+                elif attachment.content_type.startswith("video/"):
+                    vid_attachment = VideoAttachment(
+                        filename=attachment.filename, data=data
+                    )
+                    msg.attachments.append(vid_attachment)
+                elif attachment.content_type.startswith("audio/"):
+                    aud_attachment = AudioAttachment(
+                        filename=attachment.filename, data=data
+                    )
+                    msg.attachments.append(aud_attachment)
+                elif attachment.content_type.startswith("text/"):
+                    text_attachment = TextAttachment(
+                        filename=attachment.filename,
+                        data=data,
+                        mime=attachment.content_type,
+                    )
+                    msg.attachments.append(text_attachment)
+                else:
+                    # default to text attachment
+                    text_attachment = TextAttachment(
+                        filename=attachment.filename,
+                        data=data,
+                        mime=attachment.content_type,
+                    )
+                    msg.attachments.append(text_attachment)
+            else:
+                # no content type, default to text attachment
+                text_attachment = TextAttachment(
+                    filename=attachment.filename, data=data
+                )
+                msg.attachments.append(text_attachment)
+            message.content += f" [Attachment (type: {attachment.content_type or 'unknown'}): {attachment.filename}]"
+        except Exception as e:
+            constants.MAIN_LOG.log(
+                constants.Warn(f"Failed to read attachment {attachment.filename}: {e}")
+            )
+
     return msg
 
 def split_message(content: str, max_length: int = 2000) -> list[str]:

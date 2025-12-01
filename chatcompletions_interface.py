@@ -33,9 +33,20 @@ class ChatCompletions(classes.Model):
         message_history = []
         for message in conversation.messages:
             role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
-            message_history.append(
-                {"role": role, "content": str(message)}
-            )
+            message_to_add = {"role": role, "content": [{"type": "text", "text": str(message)}]}
+            for attachment in message.attachments:
+                type = None
+                if isinstance(attachment, classes.ImageAttachment):
+                    type = "image_url"
+                elif isinstance(attachment, classes.TextAttachment):
+                    type = "text"
+
+                if type:
+                    message_to_add["content"].append(
+                        {"type": type, ("text" if type == "text" else "image_url"): ({"url": attachment.url} if type == "image_url" else attachment.content)}
+                    )
+
+            message_history.append(message_to_add)
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",

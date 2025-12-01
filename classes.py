@@ -41,8 +41,11 @@ class Attachment:
 class ImageAttachment(Attachment):
     """An image attachment to a message."""
 
-    def __init__(self, filename: str, data: bytes) -> None:
+    url: str
+
+    def __init__(self, filename: str, data: bytes, url: str) -> None:
         super().__init__(filename, data)
+        self.url = url
 
 class VideoAttachment(Attachment):
     """A video attachment to a message."""
