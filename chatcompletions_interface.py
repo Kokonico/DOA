@@ -4,6 +4,8 @@ import requests
 
 from objlog.LogMessages import Info, Debug, Error
 
+from constants import MAIN_LOG
+
 
 class ChatCompletions(classes.Model):
     """A language model that uses chat/completions interface for generating responses."""
@@ -32,19 +34,22 @@ class ChatCompletions(classes.Model):
         )
         message_history = []
         for message in conversation.messages:
+            MAIN_LOG.log(Debug(f"MESSAGE ATTACHMENTS: {message.attachments}"))
             role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
             message_to_add = {"role": role, "content": [{"type": "text", "text": str(message)}]}
-            for attachment in message.attachments:
-                type = None
-                if isinstance(attachment, classes.ImageAttachment):
-                    type = "image_url"
-                elif isinstance(attachment, classes.TextAttachment):
-                    type = "text"
+            # Handle attachments (if is the last message in the conversation)
+            if message == conversation.messages[-1] and not isinstance(message, classes.AntonMessage):
+                for attachment in message.attachments:
+                    type = None
+                    if isinstance(attachment, classes.ImageAttachment):
+                        type = "image_url"
+                    elif isinstance(attachment, classes.TextAttachment):
+                        type = "text"
 
-                if type:
-                    message_to_add["content"].append(
-                        {"type": type, ("text" if type == "text" else "image_url"): ({"url": attachment.url} if type == "image_url" else attachment.data.decode('utf-8'))}
-                    )
+                    if type:
+                        message_to_add["content"].append(
+                            {"type": type, ("text" if type == "text" else "image_url"): ({"url": attachment.url} if type == "image_url" else attachment.data.decode('utf-8'))}
+                        )
 
             message_history.append(message_to_add)
 

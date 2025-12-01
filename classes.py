@@ -86,6 +86,8 @@ class Message:
         self.context = context
         self.reference = reference
         self.uuid = str(uuid.uuid4())
+        self.attachments = [] # initialize attachments as empty list (prevent shared mutable default,
+        # i'm so stupid for not catching this earlier)
 
     def string_no_reply(self):
         nick = f"\\/\\{self.author.nick}" if self.author.nick else ""

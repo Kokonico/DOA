@@ -20,8 +20,9 @@ use_remote = constants.use_remote
 
 commands_registered = False
 
+
 async def swap_mentions(
-    content: str, client: discord.Client, message: discord.Message
+        content: str, client: discord.Client, message: discord.Message
 ) -> str:
     # find all mentions of the form <@username> into proper mention format, and proper mention format into <@username>
     # main difference is prop. mentions are only integers, while the other form is username (alphanumeric)
@@ -84,7 +85,8 @@ async def swap_mentions(
                 content = content.replace(mention_str, f"<@{user.id}>").strip()
     return content
 
-async def convert_message(message: discord.Message, client: discord.Client, is_context: bool) -> Message:
+
+async def convert_message(message: discord.Message, client: discord.Client, is_context: bool, enable_attachments: bool = True) -> Message:
     # convert a discord message to our Message class
     # get nick if applicable
     nick = ""
@@ -105,6 +107,8 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
     msg.context = is_context
 
     # pull attachments
+    if not enable_attachments:
+        return msg
     for attachment in message.attachments:
         try:
             data = await attachment.read()
@@ -151,6 +155,7 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
             )
 
     return msg
+
 
 def split_message(content: str, max_length: int = 2000) -> list[str]:
     if len(content) <= max_length:
@@ -224,9 +229,9 @@ def main() -> None:
                     constants.Warn(f"Failed to fetch referenced message: {e}")
                 )
         if (
-            not isinstance(message.channel, discord.DMChannel)
-            and client.user not in message.mentions
-            and not replies_to_bot
+                not isinstance(message.channel, discord.DMChannel)
+                and client.user not in message.mentions
+                and not replies_to_bot
         ):
             return  # Ignore messages that don't mention the bot in guild channels or reply to it
 
@@ -234,7 +239,6 @@ def main() -> None:
         message.content = await swap_mentions(message.content, client, message)
 
         if ref_message:
-
             ref_message: classes.Message = await convert_message(ref_message, client, is_context=False)
         # Get or create conversation for the channel
         conversation = db_manager.load_conversation(message.channel.id)
@@ -251,9 +255,9 @@ def main() -> None:
         temp_conv.add_message(user_message)
 
         if not isinstance(message.channel, discord.DMChannel):
-            # pull context messages (past 5 messages in the channel not mentioning or involving the bot)
+            # pull context messages (past 10 messages in the channel not mentioning or involving the bot)
             async for msg in message.channel.history(
-                limit=10, before=message.created_at
+                    limit=10, before=message.created_at
             ):
                 if msg.author == client.user:
                     continue
@@ -307,7 +311,7 @@ def main() -> None:
         # keep in mind, sometimes it puts several (ex: "Daughter of Anton: Daughter of Anton: How can I help you?")
         while anton_response.content.startswith("Daughter of Anton: "):
             anton_response.content = anton_response.content[
-                len("Daughter of Anton: ") :
+                len("Daughter of Anton: "):
             ].strip()
 
         anton_response.content = await swap_mentions(
@@ -346,6 +350,7 @@ def main() -> None:
 
     if not commands_registered:
         commands_registered = True
+
         @tree.command(
             name="induce_dementia",
             description="Make DOA forget the conversation history for this channel.",
