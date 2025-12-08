@@ -139,7 +139,7 @@ class ConversationDatabaseManager(DatabaseManager):
             constants.MAIN_LOG.log(Error(f"Error retrieving attachments: {e}"))
             raise e
 
-    def resolve_replies(self, initial_id: int) -> Message
+    def resolve_replies(self, initial_id: int) -> Message:
         # Retrieve a message and its reply chain from the database by its ID.
         if not self.connected:
             constants.MAIN_LOG.log(
