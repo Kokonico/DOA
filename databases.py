@@ -3,7 +3,7 @@
 import sqlite3
 from sqlite3 import Connection, Cursor
 import constants
-from classes import Message, AntonMessage, Conversation, Person
+from classes import Message, AntonMessage, Conversation, Person, Attachment, ImageAttachment, TextAttachment, AudioAttachment, VideoAttachment
 from objlog.LogMessages import Info, Error, Debug
 
 DB_FILE = constants.DATABASE_FILE
@@ -60,6 +60,22 @@ class ConversationDatabaseManager(DatabaseManager):
             )
             """
             )
+
+            self.cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS attachments
+            (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id INTEGER,
+                type       TEXT NOT NULL,
+                filename   TEXT NOT NULL,
+                url        TEXT,
+                data       BLOB,
+                FOREIGN KEY (message_id) REFERENCES messages (id)
+            )
+            """
+            )
+
             # note: don't worry about context bool, no context messages will be saved.
             # also add key | none to "reply to" message ID later if needed
             self.cursor.execute(
@@ -84,7 +100,46 @@ class ConversationDatabaseManager(DatabaseManager):
             constants.MAIN_LOG.log(Error(f"Error initializing database tables: {e}"))
             raise e
 
-    def resolve_replies(self, initial_id: int) -> Message:
+    def resolve_attachments(self, message_id: int) -> list:
+        """Retrieve attachments for a given message ID."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot retrieve attachments.")
+            )
+            return []
+        try:
+            self.cursor.execute(
+                """
+            SELECT type, filename, url, data FROM attachments
+            WHERE message_id = ?
+            """,
+                (message_id,),
+            )
+            rows = self.cursor.fetchall()
+            attachments = []
+            for row in rows:
+                attachment_type, filename, url, data = row
+                match attachment_type:
+                    case ImageAttachment.__name__:
+                        attachment = ImageAttachment(filename=filename, url=url, data=data)
+                    case TextAttachment.__name__:
+                        attachment = TextAttachment(filename=filename, data=data)
+                    case AudioAttachment.__name__:
+                        attachment = AudioAttachment(filename=filename, data=data)
+                    case VideoAttachment.__name__:
+                        attachment = VideoAttachment(filename=filename, data=data)
+                    case _:
+                        constants.MAIN_LOG.log(Error(f"Unknown attachment type: {attachment_type}"))
+                        continue
+
+                if attachment:
+                    attachments.append(attachment)
+            return attachments
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error retrieving attachments: {e}"))
+            raise e
+
+    def resolve_replies(self, initial_id: int) -> Message
         # Retrieve a message and its reply chain from the database by its ID.
         if not self.connected:
             constants.MAIN_LOG.log(
@@ -105,6 +160,7 @@ class ConversationDatabaseManager(DatabaseManager):
                 result = Message(row[2], author=Person(name=row[0], nick=row[1]), context=False)
                 result.uuid = row[5]
                 result.timestamp = row[3]
+                result.attachments = self.resolve_attachments(initial_id)
                 while next_to_retrieve:
                     self.cursor.execute(
                         """
@@ -118,6 +174,7 @@ class ConversationDatabaseManager(DatabaseManager):
                         reply_message = Message(reply_row[2], author=Person(name=reply_row[0], nick=reply_row[1]), context=False)
                         reply_message.uuid = reply_row[5]
                         reply_message.timestamp = reply_row[3]
+                        reply_message.attachments = self.resolve_attachments(next_to_retrieve)
                         result.reference = reply_message
                         next_to_retrieve = reply_row[4]
                     else:
@@ -209,6 +266,22 @@ class ConversationDatabaseManager(DatabaseManager):
                         message.uuid
                     ),
                 )
+                # insert attachments if any
+                message_id = self.cursor.lastrowid
+                for attachment in message.attachments:
+                    self.cursor.execute(
+                        """
+                    INSERT INTO attachments (message_id, type, filename, url, data)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                        (
+                            message_id,
+                            type(attachment).__name__,
+                            attachment.filename,
+                            getattr(attachment, 'url', None),
+                            getattr(attachment, 'data', None),
+                        ),
+                    )
             self.connection.commit()
             constants.MAIN_LOG.log(Info(f"Conversation saved for channel {channel_id}"))
         except sqlite3.Error as e:
