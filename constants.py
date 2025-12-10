@@ -28,10 +28,20 @@ REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True)
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
 REMOTE_MODEL_NAME = "openai/gpt-5.1"
 
+ENABLE_MODERATION = True
+
+# other than these words (ones that aren't caught by v1/moderations), all messages are passed through to
+# v1/moderations for content filtering
+MODERATION_WORDLIST = [
+    "goon",
+    "gooning",
+    "disestablishmentarianism"  # lmao
+]
+
 DISCORD_BOT_TOKEN = os.getenv("DOA_DISCORD_BOT_TOKEN", None)
 REMOTE_AUTH_API_KEY = os.getenv("DOA_REMOTE_API_KEY", None)
 
-REMOTE_SOURCE_URL = "https://ai.hackclub.com/proxy/v1/chat/completions"
+REMOTE_SOURCE_URL = "https://ai.hackclub.com/proxy"
 
 BOOTUP_TIME = datetime.now()
 

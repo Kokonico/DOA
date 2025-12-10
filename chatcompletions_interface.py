@@ -2,7 +2,7 @@ import classes
 import constants
 import requests
 
-from objlog.LogMessages import Info, Debug, Error
+from objlog.LogMessages import Info, Debug, Error, Warn
 
 from constants import MAIN_LOG
 
@@ -15,18 +15,18 @@ class ChatCompletions(classes.Model):
     api_key: str | None = None
 
     def __init__(
-        self,
-        api_key: str | None,
-        name: str | None = None,
-        system_prompt: str | None = None,
-        api_source: str | None = None,
+            self,
+            api_key: str | None,
+            name: str | None = None,
+            system_prompt: str | None = None,
+            api_source: str | None = None,
     ) -> None:
         super().__init__(name, system_prompt)
         self.api_key = api_key
         self.source_url = api_source if api_source else self.source_url
 
     def generate_response(
-        self, conversation: classes.Conversation
+            self, conversation: classes.Conversation
     ) -> classes.AntonMessage:
         """Generate a response using the chat/completions interface based on the conversation history."""
         constants.REMOTE_LOG.log(
@@ -34,7 +34,8 @@ class ChatCompletions(classes.Model):
         )
         message_history = []
         for message in conversation.messages:
-            MAIN_LOG.log(Debug(f"MESSAGE ATTACHMENTS: {message.attachments}"))
+            if len(message.attachments) > 0:
+                MAIN_LOG.log(Debug(f"MESSAGE ATTACHMENTS: {message.attachments}"))
             role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
             message_to_add = {"role": role, "content": [{"type": "text", "text": str(message)}]}
             # Handle attachments (if is the last message in the conversation)
@@ -48,7 +49,8 @@ class ChatCompletions(classes.Model):
 
                     if type:
                         message_to_add["content"].append(
-                            {"type": type, ("text" if type == "text" else "image_url"): ({"url": attachment.url} if type == "image_url" else attachment.data.decode('utf-8'))}
+                            {"type": type, ("text" if type == "text" else "image_url"): (
+                                {"url": attachment.url} if type == "image_url" else attachment.data.decode('utf-8'))}
                         )
 
             message_history.append(message_to_add)
@@ -61,8 +63,64 @@ class ChatCompletions(classes.Model):
         payload = {
             "model": self.name,
             "messages": [{"role": "system", "content": constants.system_prompt()}]
-            + message_history,
+                        + message_history,
         }
+
+        # anti-goon technology
+
+        if constants.ENABLE_MODERATION:
+            # run messages through moderation endpoint
+            messages_to_moderate = [msg for msg in message_history if msg["role"] == "user"]
+            # note, moderations doesn't support multiple elements per message, we need to flatten them
+            new_messages_to_moderate = []
+            for msg in messages_to_moderate:
+                for content_part in msg["content"]:
+                    if content_part["type"] == "text":
+                        new_messages_to_moderate.append({"type": "text", "text": content_part["text"]})
+                    elif content_part["type"] == "image_url":
+                        new_messages_to_moderate.append(
+                            {"type": "image_url", "image_url": {"url": content_part["image_url"]["url"]}})
+
+            # look for words in the wordlist first
+            for word in constants.MODERATION_WORDLIST:
+                for msg in new_messages_to_moderate:
+                    if word in msg.get("text", ""):
+                        constants.REMOTE_LOG.log(
+                            Warn("Message flagged by wordlist moderation."),
+                            Warn(f"Flagged word: {word}")
+                        )
+                        return classes.AntonMessage(
+                            content="Your message was flagged by our moderation system and cannot be processed."
+                                    " You aren't allowed to use: " + word
+                        )
+
+            response = requests.post(
+                self.source_url + "/v1/moderations",
+                headers=headers,
+                json={"input": new_messages_to_moderate}
+            )
+            constants.REMOTE_LOG.log(Info("Sent moderation request to Moderations API."))
+            if response.status_code != 200:
+                constants.REMOTE_LOG.log(
+                    Error(
+                        f"Error from Moderations API: {response.status_code} - {response.text}"
+                    )
+                )
+                raise Exception(f"Moderations API error: {response.status_code}")
+            constants.REMOTE_LOG.log(Info("Received response from Moderations API."))
+            results = response.json()["results"]
+            for result in results:
+                if result["flagged"]:
+                    constants.REMOTE_LOG.log(
+                        Warn("Message flagged by moderation endpoint."),
+                        Warn("Reason(s): " + ", ".join(i for i in result["categories"] if result["categories"][i]))
+                    )
+                    return classes.AntonMessage(
+                        content="Your message was flagged by the moderation system and cannot be processed for the "
+                                "following reason(s): " + ", ".join(
+                            i for i in result["categories"] if result["categories"][i])
+                    )
+            constants.REMOTE_LOG.log(Info("No moderation flags detected, clear to proceed."))
 
         constants.REMOTE_LOG.log(Debug(f"Chat Completions request payload: {payload}"))
         # remove any system messages from the debug log for readability
@@ -71,7 +129,7 @@ class ChatCompletions(classes.Model):
             Info(f"Sending request to Chat Completions API at {self.source_url}")
         )
         response = requests.post(
-            self.source_url, headers=headers, json=payload, timeout=60
+            self.source_url + "/v1/chat/completions", headers=headers, json=payload, timeout=60
         )
         if response.status_code != 200:
             constants.REMOTE_LOG.log(

@@ -94,6 +94,20 @@ class ConversationDatabaseManager(DatabaseManager):
             )
             """
             )
+
+            # initialize moderations/flags table
+            self.cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS moderations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER,
+            flagged BOOLEAN NOT NULL,
+            reason TEXT,
+            FOREIGN KEY (message_id) REFERENCES messages(id)
+            )
+                """
+            )
+
             self.connection.commit()
             constants.MAIN_LOG.log(Info("Database tables initialized successfully."))
         except sqlite3.Error as e:
