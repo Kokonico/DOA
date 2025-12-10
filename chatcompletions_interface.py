@@ -1,9 +1,12 @@
+import base64
+
 import classes
 import constants
 import requests
 
 from objlog.LogMessages import Info, Debug, Error, Warn
 
+from classes import PDFAttachment
 from constants import MAIN_LOG
 
 
@@ -42,16 +45,84 @@ class ChatCompletions(classes.Model):
             if message == conversation.messages[-1] and not isinstance(message, classes.AntonMessage):
                 for attachment in message.attachments:
                     type = None
+                    data_format = None
                     if isinstance(attachment, classes.ImageAttachment):
                         type = "image_url"
                     elif isinstance(attachment, classes.TextAttachment):
                         type = "text"
+                    elif isinstance(attachment, classes.AudioAttachment):
+                        type = "input_audio"
+                        data_format = attachment.format.split("/")[-1]  # get format without "audio/"
+                    elif isinstance(attachment, classes.VideoAttachment):
+                        type = "input_video"
+                        data_format = attachment.format.split("/")[-1]  # get format without "video/"
+                    elif isinstance(attachment, PDFAttachment):
+                        type = "file"
+
 
                     if type:
-                        message_to_add["content"].append(
-                            {"type": type, ("text" if type == "text" else "image_url"): (
-                                {"url": attachment.url} if type == "image_url" else attachment.data.decode('utf-8'))}
-                        )
+                        match type:
+                            case "image_url":
+                                if not constants.DOA_FEATURE_FLAGS["image_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("Image attachments are not supported, skipping image attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "image_url", "image_url": {"url": attachment.url}}
+                                )
+                            case "text":
+                                message_to_add["content"].append(
+                                    {"type": "text", "text": attachment.data.decode('utf-8')}
+                                )
+                            case "input_audio":
+                                if not constants.DOA_FEATURE_FLAGS["audio_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("Audio attachments are not supported, skipping audio attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "file", "file": {
+                                        # convert to base64
+                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "filename": attachment.filename,
+                                    }}
+                                )
+                            case "input_video":
+                                if not constants.DOA_FEATURE_FLAGS["video_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("Video attachments are not supported, skipping video attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "file", "file": {
+                                        # convert to base64
+                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "filename": attachment.filename,
+                                    }}
+                                )
+                            case "file":
+                                if not constants.DOA_FEATURE_FLAGS["pdf_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("PDF attachments are not supported, skipping PDF attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "file", "file": {
+                                        # convert to base64
+                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "filename": attachment.filename,
+                                    }}
+                                )
+                            case _:
+                                constants.REMOTE_LOG.log(
+                                    Warn(f"Unsupported attachment type: {type}, assuming text.")
+                                )
+                                message_to_add["content"].append(
+                                    {"type": "text", "text": attachment.data.decode('utf-8')}
+                                )
+
+
 
             message_history.append(message_to_add)
 
@@ -80,6 +151,7 @@ class ChatCompletions(classes.Model):
                     elif content_part["type"] == "image_url":
                         new_messages_to_moderate.append(
                             {"type": "image_url", "image_url": {"url": content_part["image_url"]["url"]}})
+                    # rest of types are ignored for moderation for now (unsupported)
 
             # look for words in the wordlist first
             for word in constants.MODERATION_WORDLIST:
@@ -97,7 +169,8 @@ class ChatCompletions(classes.Model):
             response = requests.post(
                 self.source_url + "/v1/moderations",
                 headers=headers,
-                json={"input": new_messages_to_moderate}
+                json={"input": new_messages_to_moderate},
+                timeout=constants.REMOTE_TIMEOUT_SECONDS
             )
             constants.REMOTE_LOG.log(Info("Sent moderation request to Moderations API."))
             if response.status_code != 200:
@@ -129,7 +202,7 @@ class ChatCompletions(classes.Model):
             Info(f"Sending request to Chat Completions API at {self.source_url}")
         )
         response = requests.post(
-            self.source_url + "/v1/chat/completions", headers=headers, json=payload, timeout=60
+            self.source_url + "/v1/chat/completions", headers=headers, json=payload, timeout=constants.REMOTE_TIMEOUT_SECONDS
         )
         if response.status_code != 200:
             constants.REMOTE_LOG.log(

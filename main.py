@@ -11,7 +11,7 @@ import databases
 import discord
 from discord import app_commands
 
-from classes import Message, AudioAttachment, TextAttachment, VideoAttachment, ImageAttachment
+from classes import Message, AudioAttachment, TextAttachment, VideoAttachment, ImageAttachment, PDFAttachment
 
 db_manager = databases.ConversationDatabaseManager(constants.DATABASE_FILE)
 db_cache_manager = databases.DiscordDataCacher(constants.CACHE_DATABASE_FILE)
@@ -120,12 +120,12 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
                     msg.attachments.append(img_attachment)
                 elif attachment.content_type.startswith("video/"):
                     vid_attachment = VideoAttachment(
-                        filename=attachment.filename, data=data
+                        filename=attachment.filename, data=data, file_format=attachment.content_type
                     )
                     msg.attachments.append(vid_attachment)
                 elif attachment.content_type.startswith("audio/"):
                     aud_attachment = AudioAttachment(
-                        filename=attachment.filename, data=data
+                        filename=attachment.filename, data=data, file_format=attachment.content_type
                     )
                     msg.attachments.append(aud_attachment)
                 elif attachment.content_type.startswith("text/"):
@@ -133,6 +133,12 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
                         filename=attachment.filename,
                         data=data,
                         mime=attachment.content_type,
+                    )
+                    msg.attachments.append(text_attachment)
+                elif attachment.content_type.endswith("pdf"):
+                    text_attachment = PDFAttachment(
+                        filename=attachment.filename,
+                        data=data,
                     )
                     msg.attachments.append(text_attachment)
                 else:
@@ -295,7 +301,8 @@ def main() -> None:
                 conversation.add_message(anton_response)
             except Exception as e:
                 constants.MAIN_LOG.log(
-                    constants.Error(f"Error generating response: {e}")
+                    constants.Error(f"Error generating response"),
+                    e
                 )
                 await message.channel.send(
                     "I unfortunately encountered an error while trying to respond :(",

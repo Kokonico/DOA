@@ -54,8 +54,9 @@ class ImageAttachment(Attachment):
 class VideoAttachment(Attachment):
     """A video attachment to a message."""
 
-    def __init__(self, filename: str, data: bytes) -> None:
+    def __init__(self, filename: str, data: bytes, file_format: str) -> None:
         super().__init__(filename, data)
+        self.format = file_format
 
 
 class TextAttachment(Attachment):
@@ -71,9 +72,15 @@ class TextAttachment(Attachment):
 class AudioAttachment(Attachment):
     """An audio attachment to a message."""
 
+    def __init__(self, filename: str, data: bytes, file_format: str) -> None:
+        super().__init__(filename, data)
+        self.format = file_format
+
+class PDFAttachment(Attachment):
+    """A PDF attachment to a message."""
+
     def __init__(self, filename: str, data: bytes) -> None:
         super().__init__(filename, data)
-
 
 class Message:
     """A message written by a person."""
