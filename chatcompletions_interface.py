@@ -1,5 +1,7 @@
 import base64
 
+import objlog.utils
+
 import classes
 import constants
 import requests
@@ -7,7 +9,7 @@ import requests
 from objlog.LogMessages import Info, Debug, Error, Warn
 
 from classes import PDFAttachment
-from constants import MAIN_LOG
+from constants import MAIN_LOG, REMOTE_LOG
 
 
 class ChatCompletions(classes.Model):
@@ -28,6 +30,7 @@ class ChatCompletions(classes.Model):
         self.api_key = api_key
         self.source_url = api_source if api_source else self.source_url
 
+    # @objlog.utils.monitor(REMOTE_LOG, True, True)
     def generate_response(
             self, conversation: classes.Conversation
     ) -> classes.AntonMessage:
@@ -126,6 +129,7 @@ class ChatCompletions(classes.Model):
 
             message_history.append(message_to_add)
 
+        MAIN_LOG.log(Debug(f"Built message payload."))
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -140,31 +144,64 @@ class ChatCompletions(classes.Model):
         # anti-goon technology
 
         if constants.ENABLE_MODERATION:
+            constants.REMOTE_LOG.log(Info("Starting moderation check for conversation."))
             # run messages through moderation endpoint
-            messages_to_moderate = [msg for msg in message_history if msg["role"] == "user"]
-            # note, moderations doesn't support multiple elements per message, we need to flatten them
-            new_messages_to_moderate = []
-            for msg in messages_to_moderate:
-                for content_part in msg["content"]:
-                    if content_part["type"] == "text":
-                        new_messages_to_moderate.append({"type": "text", "text": content_part["text"]})
-                    elif content_part["type"] == "image_url":
-                        new_messages_to_moderate.append(
-                            {"type": "image_url", "image_url": {"url": content_part["image_url"]["url"]}})
-                    # rest of types are ignored for moderation for now (unsupported)
+            # message.moderation is only set for messages that have already been moderated, don't re-moderate those
+            messages_to_moderate = [msg for msg in conversation.messages if not isinstance(msg, classes.AntonMessage) and not msg.moderation.flagged]
+            # rest of types are ignored for moderation for now (unsupported)
 
             # look for words in the wordlist first
             for word in constants.MODERATION_WORDLIST:
-                for msg in new_messages_to_moderate:
-                    if word in msg.get("text", ""):
+                for msg in messages_to_moderate:
+                    if word in msg.content.lower():
                         constants.REMOTE_LOG.log(
                             Warn("Message flagged by wordlist moderation."),
                             Warn(f"Flagged word: {word}")
                         )
-                        return classes.AntonMessage(
-                            content="Your message was flagged by our moderation system and cannot be processed."
-                                    " You aren't allowed to use: " + word
-                        )
+                        msg.moderation.flagged = True
+                        msg.moderation.Categories.banned_word = word
+
+            # jsonify!
+            jsonfied_messages = []
+            message_sizes = []
+
+            constants.REMOTE_LOG.log(Info(f"Moderating {len(messages_to_moderate)} messages."))
+
+            for msg in messages_to_moderate:
+                size = 1
+                if not msg.moderation.flagged:
+                    msg_json = {
+                        "type": "text",
+                        "text": msg.content
+                    }
+                    messages_to_moderate_json = [msg_json]
+                    for attachment in msg.attachments:
+                        # only text attachments are supported for moderation for now
+                        if isinstance(attachment, classes.TextAttachment):
+                            messages_to_moderate_json.append({
+                                "type": "text",
+                                "text": attachment.data.decode('utf-8')
+                            })
+                            size += 1  # each text attachment counts as 1 extra unit
+                        elif isinstance(attachment, classes.ImageAttachment):
+                            messages_to_moderate_json.append({
+                                "type": "image_url",
+                                "image_url": {"url": attachment.url}
+                            })
+                            size += 1  # images count as 1 extra unit
+                    for _ in range(size):
+                        message_sizes.append(msg)
+
+                    jsonfied_messages.append(messages_to_moderate_json)
+
+            # flatten the list
+            # each attachment is a separate input to moderation endpoint
+            new_messages_to_moderate = []
+            for msg_list in jsonfied_messages:
+                for msg in msg_list:
+                    new_messages_to_moderate.append(msg)
+
+            REMOTE_LOG.log(Info(f"Sending {len(new_messages_to_moderate)} items to Moderations API for moderation."))
 
             response = requests.post(
                 self.source_url + "/v1/moderations",
@@ -182,17 +219,26 @@ class ChatCompletions(classes.Model):
                 raise Exception(f"Moderations API error: {response.status_code}")
             constants.REMOTE_LOG.log(Info("Received response from Moderations API."))
             results = response.json()["results"]
-            for result in results:
+            MAIN_LOG.log(Debug(f"Moderation results: {results}"))
+            for index, result in enumerate(results):
+                msg = message_sizes[index]
+                # note: only override if false, if true but new result is false, keep true
                 if result["flagged"]:
-                    constants.REMOTE_LOG.log(
-                        Warn("Message flagged by moderation endpoint."),
-                        Warn("Reason(s): " + ", ".join(i for i in result["categories"] if result["categories"][i]))
-                    )
-                    return classes.AntonMessage(
-                        content="Your message was flagged by the moderation system and cannot be processed for the "
-                                "following reason(s): " + ", ".join(
-                            i for i in result["categories"] if result["categories"][i])
-                    )
+                    msg.moderation.flagged = True
+                    msg.moderation.Categories.harassment = result["categories"]["harassment"] if not msg.moderation.Categories.harassment else True
+                    msg.moderation.Categories.harassment_threats = result["categories"]["harassment/threatening"] if not msg.moderation.Categories.harassment_threats else True
+                    msg.moderation.Categories.sexual_content = result["categories"]["sexual"] if not msg.moderation.Categories.sexual_content else True
+                    msg.moderation.Categories.hate = result["categories"]["hate"] if not msg.moderation.Categories.hate else True
+                    msg.moderation.Categories.hate_threat = result["categories"]["hate/threatening"] if not msg.moderation.Categories.hate_threat else True
+                    msg.moderation.Categories.illicit = result["categories"]["illicit"] if not msg.moderation.Categories.illicit else True
+                    msg.moderation.Categories.illicit_violent = result["categories"]["illicit/violent"] if not msg.moderation.Categories.illicit_violent else True
+                    msg.moderation.Categories.self_harm_intent = result["categories"]["self-harm/intent"] if not msg.moderation.Categories.self_harm_intent else True
+                    msg.moderation.Categories.self_harm_instruction = result["categories"]["self-harm/instructions"] if not msg.moderation.Categories.self_harm_instruction else True
+                    msg.moderation.Categories.self_harm = result["categories"]["self-harm"] if not msg.moderation.Categories.self_harm else True
+                    msg.moderation.Categories.sexual_minors = result["categories"]["sexual/minors"] if not msg.moderation.Categories.sexual_minors else True
+                    msg.moderation.Categories.violence = result["categories"]["violence"] if not msg.moderation.Categories.violence else True
+                    msg.moderation.Categories.violence_graphic = result["categories"]["violence/graphic"] if not msg.moderation.Categories.violence_graphic else True
+
             constants.REMOTE_LOG.log(Info("No moderation flags detected, clear to proceed."))
 
         constants.REMOTE_LOG.log(Debug(f"Chat Completions request payload: {payload}"))

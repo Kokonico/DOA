@@ -3,7 +3,7 @@
 import sqlite3
 from sqlite3 import Connection, Cursor
 import constants
-from classes import Message, AntonMessage, Conversation, Person, Attachment, ImageAttachment, TextAttachment, AudioAttachment, VideoAttachment
+from classes import Message, AntonMessage, Conversation, Person, ImageAttachment, TextAttachment, AudioAttachment, VideoAttachment, ModerationResult
 from objlog.LogMessages import Info, Error, Debug
 
 DB_FILE = constants.DATABASE_FILE
@@ -102,7 +102,20 @@ class ConversationDatabaseManager(DatabaseManager):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             message_id INTEGER,
             flagged BOOLEAN NOT NULL,
-            reason TEXT,
+            harassment BOOLEAN NOT NULL,
+            harassment_threatening BOOLEAN NOT NULL,
+            sexual BOOLEAN NOT NULL,
+            hate BOOLEAN NOT NULL,
+            hate_threatening BOOLEAN NOT NULL,
+            illicit BOOLEAN NOT NULL,
+            illicit_violent BOOLEAN NOT NULL,
+            self_harm_intent BOOLEAN NOT NULL,
+            self_harm_instruction BOOLEAN NOT NULL,
+            self_harm BOOLEAN NOT NULL,
+            sexual_minors BOOLEAN NOT NULL,
+            violence BOOLEAN NOT NULL,
+            violence_graphic BOOLEAN NOT NULL,
+            banned_word TEXT,
             FOREIGN KEY (message_id) REFERENCES messages(id)
             )
                 """
@@ -112,6 +125,53 @@ class ConversationDatabaseManager(DatabaseManager):
             constants.MAIN_LOG.log(Info("Database tables initialized successfully."))
         except sqlite3.Error as e:
             constants.MAIN_LOG.log(Error(f"Error initializing database tables: {e}"))
+            raise e
+
+    def resolve_moderations(self, message_id: int) -> ModerationResult | None:
+        """Retrieve moderation result for a given message ID."""
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot retrieve moderation.")
+            )
+            return None
+        try:
+            self.cursor.execute(
+                """
+            SELECT flagged, harassment, harassment_threatening, sexual, hate,
+                   hate_threatening, illicit, illicit_violent, self_harm_intent,
+                   self_harm_instruction, self_harm, sexual_minors, violence,
+                   violence_graphic, banned_word
+            FROM moderations
+            WHERE message_id = ?
+            """,
+                (message_id,),
+            )
+            row = self.cursor.fetchone()
+            if row:
+                (flagged, harassment, harassment_threatening, sexual, hate,
+                 hate_threatening, illicit, illicit_violent, self_harm_intent,
+                 self_harm_instruction, self_harm, sexual_minors, violence,
+                 violence_graphic, banned_word) = row
+                categories = ModerationResult.Categories(
+                    harassment=bool(harassment),
+                    harassment_threats=bool(harassment_threatening),
+                    sexual_content=bool(sexual),
+                    hate=bool(hate),
+                    hate_threat=bool(hate_threatening),
+                    illicit=bool(illicit),
+                    illicit_violent=bool(illicit_violent),
+                    self_harm_intent=bool(self_harm_intent),
+                    self_harm_instruction=bool(self_harm_instruction),
+                    self_harm=bool(self_harm),
+                    sexual_minors=bool(sexual_minors),
+                    violence=bool(violence),
+                    violence_graphic=bool(violence_graphic),
+                    banned_word=banned_word
+                )
+                return ModerationResult(flagged=bool(flagged), categories=categories)
+            return None
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(Error(f"Error retrieving moderation: {e}"))
             raise e
 
     def resolve_attachments(self, message_id: int) -> list:
@@ -171,10 +231,14 @@ class ConversationDatabaseManager(DatabaseManager):
             row = self.cursor.fetchone()
             if row:
                 next_to_retrieve = row[4]
-                result = Message(row[2], author=Person(name=row[0], nick=row[1]), context=False)
+                if row[0] == "Daughter of Anton":
+                    result = AntonMessage(content=row[2])
+                else:
+                    result = Message(row[2], author=Person(name=row[0], nick=row[1]), context=False)
                 result.uuid = row[5]
                 result.timestamp = row[3]
                 result.attachments = self.resolve_attachments(initial_id)
+                result.moderation = self.resolve_moderations(initial_id)
                 while next_to_retrieve:
                     self.cursor.execute(
                         """
@@ -185,9 +249,13 @@ class ConversationDatabaseManager(DatabaseManager):
                     )
                     reply_row = self.cursor.fetchone()
                     if reply_row:
-                        reply_message = Message(reply_row[2], author=Person(name=reply_row[0], nick=reply_row[1]), context=False)
+                        if reply_row[0] == "Daughter of Anton":
+                            reply_message = AntonMessage(content=reply_row[2])
+                        else:
+                            reply_message = Message(reply_row[2], author=Person(name=reply_row[0], nick=reply_row[1]), context=False)
                         reply_message.uuid = reply_row[5]
                         reply_message.timestamp = reply_row[3]
+                        reply_message.moderation = self.resolve_moderations(next_to_retrieve)
                         reply_message.attachments = self.resolve_attachments(next_to_retrieve)
                         result.reference = reply_message
                         next_to_retrieve = reply_row[4]
@@ -296,6 +364,37 @@ class ConversationDatabaseManager(DatabaseManager):
                             getattr(attachment, 'data', None),
                         ),
                     )
+                # insert moderation if any
+                if message.moderation:
+                    mod = message.moderation
+                    cat = mod.categories
+                    self.cursor.execute(
+                        """
+                    INSERT INTO moderations (message_id, flagged, harassment, harassment_threatening,
+                                             sexual, hate, hate_threatening, illicit, illicit_violent,
+                                             self_harm_intent, self_harm_instruction, self_harm,
+                                             sexual_minors, violence, violence_graphic, banned_word)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                        (
+                            message_id,
+                            int(mod.flagged),
+                            int(cat.harassment),
+                            int(cat.harassment_threats),
+                            int(cat.sexual_content),
+                            int(cat.hate),
+                            int(cat.hate_threat),
+                            int(cat.illicit),
+                            int(cat.illicit_violent),
+                            int(cat.self_harm_intent),
+                            int(cat.self_harm_instruction),
+                            int(cat.self_harm),
+                            int(cat.sexual_minors),
+                            int(cat.violence),
+                            int(cat.violence_graphic),
+                            str(mod.categories.banned_word) if mod.categories.banned_word else None
+                        ),
+                    )
             self.connection.commit()
             constants.MAIN_LOG.log(Info(f"Conversation saved for channel {channel_id}"))
         except sqlite3.Error as e:
@@ -362,7 +461,7 @@ class ConversationDatabaseManager(DatabaseManager):
                 conversation_id = result[0]
                 self.cursor.execute(
                     """
-                    SELECT author, content, timestamp, nick, reply_to, uuid
+                    SELECT id
                     FROM messages
                     WHERE conversation_id = ?
                     ORDER BY timestamp
@@ -371,19 +470,11 @@ class ConversationDatabaseManager(DatabaseManager):
                 )
                 message_rows = self.cursor.fetchall()
                 conversation = Conversation()
-                for author, content, timestamp, nick, reply_to, uuid in message_rows:
-                    if author == "Daughter of Anton":
-                        message = AntonMessage(content=content)
-                    else:
-                        message = Message(content=content, author=Person(name=author, nick=nick))
-
-                    if reply_to:
-                        message.reference = self.resolve_replies(reply_to)
-                    message.timestamp = timestamp
-                    message.uuid = uuid # ensure UUID is set to the database value
+                for (message_id,) in message_rows:
+                    message = self.resolve_replies(message_id)
                     conversation.add_message(message)
                 conversations_dict[conversation_id] = conversation
-            constants.MAIN_LOG.log(Info("All conversations loaded from database."))
+            constants.MAIN_LOG.log(Info("All messages loaded from database."))
             return conversations_dict
         except sqlite3.Error as e:
             constants.MAIN_LOG.log(Error(f"Error loading conversations: {e}"))

@@ -28,6 +28,16 @@ REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True)
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
 REMOTE_MODEL_NAME = "openai/gpt-5.1"
 
+REMOTE_TIMEOUT_SECONDS = 600  # 10 minutes, some AI models take a while to respond
+
+DOA_FEATURE_FLAGS = {
+    "image_support": True,
+    "video_support": False,
+    "text_attachment_support": True,
+    "audio_support": False,
+    "pdf_support": False,
+}
+
 ENABLE_MODERATION = True
 
 # other than these words (ones that aren't caught by v1/moderations), all messages are passed through to

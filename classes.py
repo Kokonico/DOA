@@ -76,11 +76,73 @@ class AudioAttachment(Attachment):
         super().__init__(filename, data)
         self.format = file_format
 
+
 class PDFAttachment(Attachment):
     """A PDF attachment to a message."""
 
     def __init__(self, filename: str, data: bytes) -> None:
         super().__init__(filename, data)
+
+
+class ModerationResult:
+    """A moderation result for a message."""
+
+    flagged: bool
+
+    class Categories:
+        harassment: bool
+        harassment_threats: bool
+        sexual_content: bool
+        hate: bool
+        hate_threat: bool
+        illicit: bool
+        illicit_violent: bool
+        self_harm_intent: bool
+        self_harm_instruction: bool
+        self_harm: bool
+        sexual_minors: bool
+        violence: bool
+        violence_graphic: bool
+        banned_word: str | None = None
+
+        def __init__(self, harassment: bool = False, harassment_threats: bool = False, sexual_content: bool = False,
+                     hate: bool = False, hate_threat: bool = False, illicit: bool = False,
+                     illicit_violent: bool = False, self_harm_intent: bool = False,
+                     self_harm_instruction: bool = False, self_harm: bool = False,
+                     sexual_minors: bool = False, violence: bool = False,
+                     violence_graphic: bool = False, banned_word: str | None = None) -> None:
+            self.harassment = harassment
+            self.harassment_threats = harassment_threats
+            self.sexual_content = sexual_content
+            self.hate = hate
+            self.hate_threat = hate_threat
+            self.illicit = illicit
+            self.illicit_violent = illicit_violent
+            self.self_harm_intent = self_harm_intent
+            self.self_harm_instruction = self_harm_instruction
+            self.self_harm = self_harm
+            self.sexual_minors = sexual_minors
+            self.violence = violence
+            self.violence_graphic = violence_graphic
+            self.banned_word = banned_word
+
+        def get_flagged_categories(self) -> list[str]:
+            flagged = []
+            for category, value in vars(self).items():
+                if value is True:
+                    flagged.append(category)
+            return flagged
+
+
+    categories: Categories
+
+    def __init__(self, flagged: bool, categories: Categories) -> None:
+        self.flagged = flagged
+        self.categories = categories
+
+    def reasons_as_string(self) -> str:
+        return ", ".join(self.categories.get_flagged_categories())
+
 
 class Message:
     """A message written by a person."""
@@ -89,6 +151,7 @@ class Message:
     author: Person
     timestamp: float
     context: bool
+    moderation: ModerationResult | None = None
     reference: Message | None = None
     attachments: list[Attachment] = []
     uuid: str
@@ -103,12 +166,17 @@ class Message:
         self.uuid = str(uuid.uuid4())
         self.attachments = []  # initialize attachments as empty list (prevent shared mutable default,
         # i'm so stupid for not catching this earlier)
+        self.moderation = ModerationResult(flagged=False,
+                                         categories=ModerationResult.Categories())  # default moderation result
 
     def string_no_reply(self):
         nick = f"\\/\\{self.author.nick}" if self.author.nick else ""
-        return f"{self.author.name}{nick}: {self.content} " + "".join(
-            [f" [Attachment (type: {type(attachment).__name__}, filename: {attachment.filename})]" for attachment in
-             self.attachments])
+        if not self.moderation.flagged:
+            return f"{self.author.name}{nick}: {self.content} " + "".join(
+                [f" [Attachment (type: {type(attachment).__name__}, filename: {attachment.filename})]" for attachment in
+                 self.attachments])
+        else:
+            return f"{self.author.name}{nick}: [Message moderated for: {self.moderation.reasons_as_string()}]"
 
     def __repr__(self):
         return f"<Message author={self.author.name} timestamp={self.timestamp} context={self.context} content={self.content}>"
