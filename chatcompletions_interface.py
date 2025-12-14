@@ -38,107 +38,11 @@ class ChatCompletions(classes.Model):
         constants.REMOTE_LOG.log(
             Info("Generating response using Chat Completions interface.")
         )
-        message_history = []
-        for message in conversation.messages:
-            if len(message.attachments) > 0:
-                MAIN_LOG.log(Debug(f"MESSAGE ATTACHMENTS: {message.attachments}"))
-            role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
-            message_to_add = {"role": role, "content": [{"type": "text", "text": str(message)}]}
-            # Handle attachments (if is the last message in the conversation)
-            if message == conversation.messages[-1] and not isinstance(message, classes.AntonMessage):
-                for attachment in message.attachments:
-                    type = None
-                    data_format = None
-                    if isinstance(attachment, classes.ImageAttachment):
-                        type = "image_url"
-                    elif isinstance(attachment, classes.TextAttachment):
-                        type = "text"
-                    elif isinstance(attachment, classes.AudioAttachment):
-                        type = "input_audio"
-                        data_format = attachment.format.split("/")[-1]  # get format without "audio/"
-                    elif isinstance(attachment, classes.VideoAttachment):
-                        type = "input_video"
-                        data_format = attachment.format.split("/")[-1]  # get format without "video/"
-                    elif isinstance(attachment, PDFAttachment):
-                        type = "file"
 
-
-                    if type:
-                        match type:
-                            case "image_url":
-                                if not constants.DOA_FEATURE_FLAGS["image_support"]:
-                                    constants.REMOTE_LOG.log(
-                                        Warn("Image attachments are not supported, skipping image attachment.")
-                                    )
-                                    continue
-                                message_to_add["content"].append(
-                                    {"type": "image_url", "image_url": {"url": attachment.url}}
-                                )
-                            case "text":
-                                message_to_add["content"].append(
-                                    {"type": "text", "text": attachment.data.decode('utf-8')}
-                                )
-                            case "input_audio":
-                                if not constants.DOA_FEATURE_FLAGS["audio_support"]:
-                                    constants.REMOTE_LOG.log(
-                                        Warn("Audio attachments are not supported, skipping audio attachment.")
-                                    )
-                                    continue
-                                message_to_add["content"].append(
-                                    {"type": "file", "file": {
-                                        # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
-                                    }}
-                                )
-                            case "input_video":
-                                if not constants.DOA_FEATURE_FLAGS["video_support"]:
-                                    constants.REMOTE_LOG.log(
-                                        Warn("Video attachments are not supported, skipping video attachment.")
-                                    )
-                                    continue
-                                message_to_add["content"].append(
-                                    {"type": "file", "file": {
-                                        # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
-                                    }}
-                                )
-                            case "file":
-                                if not constants.DOA_FEATURE_FLAGS["pdf_support"]:
-                                    constants.REMOTE_LOG.log(
-                                        Warn("PDF attachments are not supported, skipping PDF attachment.")
-                                    )
-                                    continue
-                                message_to_add["content"].append(
-                                    {"type": "file", "file": {
-                                        # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
-                                    }}
-                                )
-                            case _:
-                                constants.REMOTE_LOG.log(
-                                    Warn(f"Unsupported attachment type: {type}, assuming text.")
-                                )
-                                message_to_add["content"].append(
-                                    {"type": "text", "text": attachment.data.decode('utf-8')}
-                                )
-
-
-
-            message_history.append(message_to_add)
-
-        MAIN_LOG.log(Debug(f"Built message payload."))
+        # prepare headers
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-        }
-
-        payload = {
-            "model": self.name,
-            "messages": [{"role": "system", "content": constants.system_prompt()}]
-                        + message_history,
         }
 
         # anti-goon technology
@@ -238,8 +142,108 @@ class ChatCompletions(classes.Model):
                     msg.moderation.categories.sexual_minors = result["categories"]["sexual/minors"] if not msg.moderation.categories.sexual_minors else True
                     msg.moderation.categories.violence = result["categories"]["violence"] if not msg.moderation.categories.violence else True
                     msg.moderation.categories.violence_graphic = result["categories"]["violence/graphic"] if not msg.moderation.categories.violence_graphic else True
+                    constants.REMOTE_LOG.log(
+                        Warn("Message flagged by Moderations API."),
+                        Warn(f"Flagged categories: {msg.moderation.categories.get_flagged_categories()}")
+                    )
+                else:
+                    constants.REMOTE_LOG.log(Info("No moderation flags detected, clear to proceed."))
 
-            constants.REMOTE_LOG.log(Info("No moderation flags detected, clear to proceed."))
+        message_history = []
+        for message in conversation.messages:
+            if len(message.attachments) > 0:
+                MAIN_LOG.log(Debug(f"MESSAGE ATTACHMENTS: {message.attachments}"))
+            role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
+            message_to_add = {"role": role, "content": [{"type": "text", "text": str(message)}]}
+            # Handle attachments (if is the last message in the conversation)
+            if message == conversation.messages[-1] and not isinstance(message, classes.AntonMessage):
+                for attachment in message.attachments:
+                    type = None
+                    data_format = None
+                    if isinstance(attachment, classes.ImageAttachment):
+                        type = "image_url"
+                    elif isinstance(attachment, classes.TextAttachment):
+                        type = "text"
+                    elif isinstance(attachment, classes.AudioAttachment):
+                        type = "input_audio"
+                        data_format = attachment.format.split("/")[-1]  # get format without "audio/"
+                    elif isinstance(attachment, classes.VideoAttachment):
+                        type = "input_video"
+                        data_format = attachment.format.split("/")[-1]  # get format without "video/"
+                    elif isinstance(attachment, PDFAttachment):
+                        type = "file"
+
+                    if type:
+                        match type:
+                            case "image_url":
+                                if not constants.DOA_FEATURE_FLAGS["image_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("Image attachments are not supported, skipping image attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "image_url", "image_url": {"url": attachment.url}}
+                                )
+                            case "text":
+                                message_to_add["content"].append(
+                                    {"type": "text", "text": attachment.data.decode('utf-8')}
+                                )
+                            case "input_audio":
+                                if not constants.DOA_FEATURE_FLAGS["audio_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("Audio attachments are not supported, skipping audio attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "file", "file": {
+                                        # convert to base64
+                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "filename": attachment.filename,
+                                    }}
+                                )
+                            case "input_video":
+                                if not constants.DOA_FEATURE_FLAGS["video_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("Video attachments are not supported, skipping video attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "file", "file": {
+                                        # convert to base64
+                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "filename": attachment.filename,
+                                    }}
+                                )
+                            case "file":
+                                if not constants.DOA_FEATURE_FLAGS["pdf_support"]:
+                                    constants.REMOTE_LOG.log(
+                                        Warn("PDF attachments are not supported, skipping PDF attachment.")
+                                    )
+                                    continue
+                                message_to_add["content"].append(
+                                    {"type": "file", "file": {
+                                        # convert to base64
+                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "filename": attachment.filename,
+                                    }}
+                                )
+                            case _:
+                                constants.REMOTE_LOG.log(
+                                    Warn(f"Unsupported attachment type: {type}, assuming text.")
+                                )
+                                message_to_add["content"].append(
+                                    {"type": "text", "text": attachment.data.decode('utf-8')}
+                                )
+
+            message_history.append(message_to_add)
+
+        MAIN_LOG.log(Debug(f"Built message payload."))
+
+        payload = {
+            "model": self.name,
+            "messages": [{"role": "system", "content": constants.system_prompt()}]
+                        + message_history,
+        }
 
         constants.REMOTE_LOG.log(Debug(f"Chat Completions request payload: {payload}"))
         # remove any system messages from the debug log for readability
