@@ -225,19 +225,19 @@ class ChatCompletions(classes.Model):
                 # note: only override if false, if true but new result is false, keep true
                 if result["flagged"]:
                     msg.moderation.flagged = True
-                    msg.moderation.Categories.harassment = result["categories"]["harassment"] if not msg.moderation.Categories.harassment else True
-                    msg.moderation.Categories.harassment_threats = result["categories"]["harassment/threatening"] if not msg.moderation.Categories.harassment_threats else True
-                    msg.moderation.Categories.sexual_content = result["categories"]["sexual"] if not msg.moderation.Categories.sexual_content else True
-                    msg.moderation.Categories.hate = result["categories"]["hate"] if not msg.moderation.Categories.hate else True
-                    msg.moderation.Categories.hate_threat = result["categories"]["hate/threatening"] if not msg.moderation.Categories.hate_threat else True
-                    msg.moderation.Categories.illicit = result["categories"]["illicit"] if not msg.moderation.Categories.illicit else True
-                    msg.moderation.Categories.illicit_violent = result["categories"]["illicit/violent"] if not msg.moderation.Categories.illicit_violent else True
-                    msg.moderation.Categories.self_harm_intent = result["categories"]["self-harm/intent"] if not msg.moderation.Categories.self_harm_intent else True
-                    msg.moderation.Categories.self_harm_instruction = result["categories"]["self-harm/instructions"] if not msg.moderation.Categories.self_harm_instruction else True
-                    msg.moderation.Categories.self_harm = result["categories"]["self-harm"] if not msg.moderation.Categories.self_harm else True
-                    msg.moderation.Categories.sexual_minors = result["categories"]["sexual/minors"] if not msg.moderation.Categories.sexual_minors else True
-                    msg.moderation.Categories.violence = result["categories"]["violence"] if not msg.moderation.Categories.violence else True
-                    msg.moderation.Categories.violence_graphic = result["categories"]["violence/graphic"] if not msg.moderation.Categories.violence_graphic else True
+                    msg.moderation.categories.harassment = result["categories"]["harassment"] if not msg.moderation.categories.harassment else True
+                    msg.moderation.categories.harassment_threats = result["categories"]["harassment/threatening"] if not msg.moderation.categories.harassment_threats else True
+                    msg.moderation.categories.sexual_content = result["categories"]["sexual"] if not msg.moderation.categories.sexual_content else True
+                    msg.moderation.categories.hate = result["categories"]["hate"] if not msg.moderation.categories.hate else True
+                    msg.moderation.categories.hate_threat = result["categories"]["hate/threatening"] if not msg.moderation.categories.hate_threat else True
+                    msg.moderation.categories.illicit = result["categories"]["illicit"] if not msg.moderation.categories.illicit else True
+                    msg.moderation.categories.illicit_violent = result["categories"]["illicit/violent"] if not msg.moderation.categories.illicit_violent else True
+                    msg.moderation.categories.self_harm_intent = result["categories"]["self-harm/intent"] if not msg.moderation.categories.self_harm_intent else True
+                    msg.moderation.categories.self_harm_instruction = result["categories"]["self-harm/instructions"] if not msg.moderation.categories.self_harm_instruction else True
+                    msg.moderation.categories.self_harm = result["categories"]["self-harm"] if not msg.moderation.categories.self_harm else True
+                    msg.moderation.categories.sexual_minors = result["categories"]["sexual/minors"] if not msg.moderation.categories.sexual_minors else True
+                    msg.moderation.categories.violence = result["categories"]["violence"] if not msg.moderation.categories.violence else True
+                    msg.moderation.categories.violence_graphic = result["categories"]["violence/graphic"] if not msg.moderation.categories.violence_graphic else True
 
             constants.REMOTE_LOG.log(Info("No moderation flags detected, clear to proceed."))
 
