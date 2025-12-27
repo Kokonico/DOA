@@ -220,7 +220,7 @@ class Conversation:
         """clear all messages marked as context"""
         self.messages = [msg for msg in self.messages if not msg.context]
 
-    def run_moderations(self, api_key: str) -> None:
+    def run_moderations(self, api_key: str, moderation_url: str) -> None:
         """run moderation on all messages in the conversation IF they haven't been moderated yet"""
         if constants.ENABLE_MODERATION:
             constants.REMOTE_LOG.log(Info("Starting moderation check for conversation."))
@@ -287,7 +287,7 @@ class Conversation:
             REMOTE_LOG.log(Info(f"Sending {len(new_messages_to_moderate)} items to Moderations API for moderation."))
 
             response = requests.post(
-                self.source_url + "/v1/moderations",
+                moderation_url + "/v1/moderations",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",

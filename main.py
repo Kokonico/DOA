@@ -262,7 +262,7 @@ def main() -> None:
 
         # moderate the temp conversation
         if constants.ENABLE_MODERATION:
-            temp_conv.run_moderations(api_key=constants.REMOTE_AUTH_API_KEY)
+            temp_conv.run_moderations(api_key=constants.REMOTE_AUTH_API_KEY, moderation_url=constants.REMOTE_SOURCE_URL)
 
         if not isinstance(message.channel, discord.DMChannel):
             # pull context messages (past 10 messages in the channel not mentioning or involving the bot)
