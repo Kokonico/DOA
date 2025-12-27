@@ -801,14 +801,14 @@ files = [
 
 [[package]]
 name = "objlog"
-version = "3.0.0"
+version = "3.0.4"
 description = "Logging, Objectified."
 optional = false
-python-versions = "<4.0,>=3.10"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "objlog-3.0.0-py3-none-any.whl", hash = "sha256:28da9c662e6cb917d40e796d6927e88ca21fc7456d1fe909c47bbe25345b2783"},
-    {file = "objlog-3.0.0.tar.gz", hash = "sha256:4d604545ae78954ab4c533b417b96fd5296e51e4121d64ca8828c9a9825c2c49"},
+    {file = "objlog-3.0.4-py3-none-any.whl", hash = "sha256:954b4e4dee836f5d9f74526ae0ae102f506405d698236ad32ba39263cb831711"},
+    {file = "objlog-3.0.4.tar.gz", hash = "sha256:cae8374dbe690f3c4f706353db38c5d9d24691d31a9cb30b26e4612263888bda"},
 ]
 
 [[package]]
@@ -1353,4 +1353,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "bf59fc71e8e9a8cfd3abd363cb3003fbb3ba42cb517ba8a13ca909d12d56702f"
+content-hash = "72c4220b733502301f53f0e3e20108db4ed67acf7c02a3c4e79795cc52b6ead8"

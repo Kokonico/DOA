@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import datetime
 import uuid
+import requests
+
+import constants
+from constants import MAIN_LOG, REMOTE_LOG, Info, Warn, Error, Debug
 
 
 # conversational classes
@@ -88,6 +92,7 @@ class ModerationResult:
     """A moderation result for a message."""
 
     flagged: bool
+    moderated: bool = False  # if the message has even been moderated yet
 
     class Categories:
         harassment: bool
@@ -136,8 +141,9 @@ class ModerationResult:
 
     categories: Categories
 
-    def __init__(self, flagged: bool, categories: Categories) -> None:
+    def __init__(self, flagged: bool, categories: Categories, moderated: bool = False) -> None:
         self.flagged = flagged
+        self.moderated = moderated
         self.categories = categories
 
     def reasons_as_string(self) -> str:
@@ -166,7 +172,7 @@ class Message:
         self.uuid = str(uuid.uuid4())
         self.attachments = []  # initialize attachments as empty list (prevent shared mutable default,
         # i'm so stupid for not catching this earlier)
-        self.moderation = ModerationResult(flagged=False,
+        self.moderation = ModerationResult(flagged=False, moderated=False,
                                          categories=ModerationResult.Categories())  # default moderation result
 
     def string_no_reply(self):
@@ -213,6 +219,117 @@ class Conversation:
     def clear_context(self) -> None:
         """clear all messages marked as context"""
         self.messages = [msg for msg in self.messages if not msg.context]
+
+    def run_moderations(self, api_key: str) -> None:
+        """run moderation on all messages in the conversation IF they haven't been moderated yet"""
+        if constants.ENABLE_MODERATION:
+            constants.REMOTE_LOG.log(Info("Starting moderation check for conversation."))
+            # run messages through moderation endpoint
+            # message.moderation is only set for messages that have already been moderated, don't re-moderate those
+            # messages_to_moderate contains the self.messages's indexes that need moderation
+            messages_to_moderate = []
+            for i, msg in enumerate(self.messages):
+                if not msg.moderation.moderated and not isinstance(msg, AntonMessage):
+                    msg.moderation.moderated = True  # mark as moderated to prevent re-moderation
+                    messages_to_moderate.append(i) # store index for later use, so we can modify the original messages later
+            # rest of types are ignored for moderation for now (unsupported)
+
+            # look for words in the wordlist first
+            for word in constants.MODERATION_WORDLIST:
+                for msg_index in messages_to_moderate:
+                    if word in self.messages[msg_index].content.lower():
+                        constants.REMOTE_LOG.log(
+                            Warn("Message flagged by wordlist moderation."),
+                            Warn(f"Flagged word: {word}")
+                        )
+                        self.messages[msg_index].moderation.flagged = True
+                        self.messages[msg_index].moderation.Categories.banned_word = word
+
+            # jsonify!
+            jsonfied_messages = []
+            message_sizes = []
+
+            constants.REMOTE_LOG.log(Info(f"Moderating {len(messages_to_moderate)} messages."))
+
+            for msg_index in messages_to_moderate:
+                size = 1
+                if not self.messages[msg_index].moderation.flagged:
+                    msg_json = {
+                        "type": "text",
+                        "text": self.messages[msg_index].content
+                    }
+                    messages_to_moderate_json = [msg_json]
+                    for attachment in self.messages[msg_index].attachments:
+                        # only text attachments are supported for moderation for now
+                        if isinstance(attachment, TextAttachment):
+                            messages_to_moderate_json.append({
+                                "type": "text",
+                                "text": attachment.data.decode('utf-8')
+                            })
+                        elif isinstance(attachment, ImageAttachment):
+                            messages_to_moderate_json.append({
+                                "type": "image_url",
+                                "image_url": {"url": attachment.url}
+                            })
+                        size += 1  # attachments also count towards size
+                    for _ in range(size):
+                        message_sizes.append(msg_index)
+
+                    jsonfied_messages.append(messages_to_moderate_json)
+
+            # flatten the list
+            # each attachment is a separate input to moderation endpoint
+            new_messages_to_moderate = []
+            for msg_list in jsonfied_messages:
+                for msg in msg_list:
+                    new_messages_to_moderate.append(msg)
+
+            REMOTE_LOG.log(Info(f"Sending {len(new_messages_to_moderate)} items to Moderations API for moderation."))
+
+            response = requests.post(
+                self.source_url + "/v1/moderations",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"input": new_messages_to_moderate},
+                timeout=constants.REMOTE_TIMEOUT_SECONDS
+            )
+            constants.REMOTE_LOG.log(Info("Sent moderation request to Moderations API."))
+            if response.status_code != 200:
+                constants.REMOTE_LOG.log(
+                    Error(
+                        f"Error from Moderations API: {response.status_code} - {response.text}"
+                    )
+                )
+                raise Exception(f"Moderations API error: {response.status_code}")
+            constants.REMOTE_LOG.log(Info("Received response from Moderations API."))
+            results = response.json()["results"]
+            MAIN_LOG.log(Debug(f"Moderation results: {results}"))
+            for index, result in enumerate(results):
+                msg_index = message_sizes[index]
+                # note: only override if false, if true but new result is false, keep true
+                if result["flagged"]:
+                    self.messages[msg_index].moderation.flagged = True
+                    self.messages[msg_index].moderation.categories.harassment = result["categories"]["harassment"] if not msg.moderation.categories.harassment else True
+                    self.messages[msg_index].moderation.categories.harassment_threats = result["categories"]["harassment/threatening"] if not msg.moderation.categories.harassment_threats else True
+                    self.messages[msg_index].moderation.categories.sexual_content = result["categories"]["sexual"] if not msg.moderation.categories.sexual_content else True
+                    self.messages[msg_index].moderation.categories.hate = result["categories"]["hate"] if not msg.moderation.categories.hate else True
+                    self.messages[msg_index].moderation.categories.hate_threat = result["categories"]["hate/threatening"] if not msg.moderation.categories.hate_threat else True
+                    self.messages[msg_index].moderation.categories.illicit = result["categories"]["illicit"] if not msg.moderation.categories.illicit else True
+                    self.messages[msg_index].moderation.categories.illicit_violent = result["categories"]["illicit/violent"] if not msg.moderation.categories.illicit_violent else True
+                    self.messages[msg_index].moderation.categories.self_harm_intent = result["categories"]["self-harm/intent"] if not msg.moderation.categories.self_harm_intent else True
+                    self.messages[msg_index].moderation.categories.self_harm_instruction = result["categories"]["self-harm/instructions"] if not msg.moderation.categories.self_harm_instruction else True
+                    self.messages[msg_index].moderation.categories.self_harm = result["categories"]["self-harm"] if not msg.moderation.categories.self_harm else True
+                    self.messages[msg_index].moderation.categories.sexual_minors = result["categories"]["sexual/minors"] if not msg.moderation.categories.sexual_minors else True
+                    self.messages[msg_index].moderation.categories.violence = result["categories"]["violence"] if not msg.moderation.categories.violence else True
+                    self.messages[msg_index].moderation.categories.violence_graphic = result["categories"]["violence/graphic"] if not msg.moderation.categories.violence_graphic else True
+                    constants.REMOTE_LOG.log(
+                        Warn("Message flagged by Moderations API."),
+                        Warn(f"Flagged categories: {self.messages[msg_index].moderation.categories.get_flagged_categories()}")
+                    )
+                else:
+                    constants.REMOTE_LOG.log(Info("No moderation flags detected, clear to proceed."))
 
 
 class Model:

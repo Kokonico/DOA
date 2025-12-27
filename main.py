@@ -260,6 +260,10 @@ def main() -> None:
         temp_conv.messages = conversation.messages.copy()
         temp_conv.add_message(user_message)
 
+        # moderate the temp conversation
+        if constants.ENABLE_MODERATION:
+            temp_conv.run_moderations(api_key=constants.REMOTE_AUTH_API_KEY)
+
         if not isinstance(message.channel, discord.DMChannel):
             # pull context messages (past 10 messages in the channel not mentioning or involving the bot)
             async for msg in message.channel.history(
@@ -297,8 +301,9 @@ def main() -> None:
                     model.generate_response, temp_conv
                 )
                 # add both user message and bot response to conversation
-                conversation.add_message(user_message)
+                conversation.messages = temp_conv.messages
                 conversation.add_message(anton_response)
+
             except Exception as e:
                 constants.MAIN_LOG.log(
                     constants.Error(f"Error generating response"),

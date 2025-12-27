@@ -102,6 +102,7 @@ class ConversationDatabaseManager(DatabaseManager):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             message_id INTEGER,
             flagged BOOLEAN NOT NULL,
+            moderated BOOLEAN NOT NULL,
             harassment BOOLEAN NOT NULL,
             harassment_threatening BOOLEAN NOT NULL,
             sexual BOOLEAN NOT NULL,
@@ -137,7 +138,7 @@ class ConversationDatabaseManager(DatabaseManager):
         try:
             self.cursor.execute(
                 """
-            SELECT flagged, harassment, harassment_threatening, sexual, hate,
+            SELECT flagged, moderated, harassment, harassment_threatening, sexual, hate,
                    hate_threatening, illicit, illicit_violent, self_harm_intent,
                    self_harm_instruction, self_harm, sexual_minors, violence,
                    violence_graphic, banned_word
@@ -148,7 +149,7 @@ class ConversationDatabaseManager(DatabaseManager):
             )
             row = self.cursor.fetchone()
             if row:
-                (flagged, harassment, harassment_threatening, sexual, hate,
+                (flagged, moderated, harassment, harassment_threatening, sexual, hate,
                  hate_threatening, illicit, illicit_violent, self_harm_intent,
                  self_harm_instruction, self_harm, sexual_minors, violence,
                  violence_graphic, banned_word) = row
@@ -168,7 +169,7 @@ class ConversationDatabaseManager(DatabaseManager):
                     violence_graphic=bool(violence_graphic),
                     banned_word=banned_word
                 )
-                return ModerationResult(flagged=bool(flagged), categories=categories)
+                return ModerationResult(flagged=bool(flagged), moderated=bool(moderated), categories=categories)
             return None
         except sqlite3.Error as e:
             constants.MAIN_LOG.log(Error(f"Error retrieving moderation: {e}"))
