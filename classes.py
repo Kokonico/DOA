@@ -311,19 +311,19 @@ class Conversation:
                 # note: only override if false, if true but new result is false, keep true
                 if result["flagged"]:
                     self.messages[msg_index].moderation.flagged = True
-                    self.messages[msg_index].moderation.categories.harassment = result["categories"]["harassment"] if not msg.moderation.categories.harassment else True
-                    self.messages[msg_index].moderation.categories.harassment_threats = result["categories"]["harassment/threatening"] if not msg.moderation.categories.harassment_threats else True
-                    self.messages[msg_index].moderation.categories.sexual_content = result["categories"]["sexual"] if not msg.moderation.categories.sexual_content else True
-                    self.messages[msg_index].moderation.categories.hate = result["categories"]["hate"] if not msg.moderation.categories.hate else True
-                    self.messages[msg_index].moderation.categories.hate_threat = result["categories"]["hate/threatening"] if not msg.moderation.categories.hate_threat else True
-                    self.messages[msg_index].moderation.categories.illicit = result["categories"]["illicit"] if not msg.moderation.categories.illicit else True
-                    self.messages[msg_index].moderation.categories.illicit_violent = result["categories"]["illicit/violent"] if not msg.moderation.categories.illicit_violent else True
-                    self.messages[msg_index].moderation.categories.self_harm_intent = result["categories"]["self-harm/intent"] if not msg.moderation.categories.self_harm_intent else True
-                    self.messages[msg_index].moderation.categories.self_harm_instruction = result["categories"]["self-harm/instructions"] if not msg.moderation.categories.self_harm_instruction else True
-                    self.messages[msg_index].moderation.categories.self_harm = result["categories"]["self-harm"] if not msg.moderation.categories.self_harm else True
-                    self.messages[msg_index].moderation.categories.sexual_minors = result["categories"]["sexual/minors"] if not msg.moderation.categories.sexual_minors else True
-                    self.messages[msg_index].moderation.categories.violence = result["categories"]["violence"] if not msg.moderation.categories.violence else True
-                    self.messages[msg_index].moderation.categories.violence_graphic = result["categories"]["violence/graphic"] if not msg.moderation.categories.violence_graphic else True
+                    self.messages[msg_index].moderation.categories.harassment = result["categories"]["harassment"] if not self.messages[msg_index].moderation.categories.harassment else True
+                    self.messages[msg_index].moderation.categories.harassment_threats = result["categories"]["harassment/threatening"] if not self.messages[msg_index].moderation.categories.harassment_threats else True
+                    self.messages[msg_index].moderation.categories.sexual_content = result["categories"]["sexual"] if not self.messages[msg_index].moderation.categories.sexual_content else True
+                    self.messages[msg_index].moderation.categories.hate = result["categories"]["hate"] if not self.messages[msg_index].moderation.categories.hate else True
+                    self.messages[msg_index].moderation.categories.hate_threat = result["categories"]["hate/threatening"] if not self.messages[msg_index].moderation.categories.hate_threat else True
+                    self.messages[msg_index].moderation.categories.illicit = result["categories"]["illicit"] if not self.messages[msg_index].moderation.categories.illicit else True
+                    self.messages[msg_index].moderation.categories.illicit_violent = result["categories"]["illicit/violent"] if not self.messages[msg_index].moderation.categories.illicit_violent else True
+                    self.messages[msg_index].moderation.categories.self_harm_intent = result["categories"]["self-harm/intent"] if not self.messages[msg_index].moderation.categories.self_harm_intent else True
+                    self.messages[msg_index].moderation.categories.self_harm_instruction = result["categories"]["self-harm/instructions"] if not self.messages[msg_index].moderation.categories.self_harm_instruction else True
+                    self.messages[msg_index].moderation.categories.self_harm = result["categories"]["self-harm"] if not self.messages[msg_index].moderation.categories.self_harm else True
+                    self.messages[msg_index].moderation.categories.sexual_minors = result["categories"]["sexual/minors"] if not self.messages[msg_index].moderation.categories.sexual_minors else True
+                    self.messages[msg_index].moderation.categories.violence = result["categories"]["violence"] if not self.messages[msg_index].moderation.categories.violence else True
+                    self.messages[msg_index].moderation.categories.violence_graphic = result["categories"]["violence/graphic"] if not self.messages[msg_index].moderation.categories.violence_graphic else True
                     constants.REMOTE_LOG.log(
                         Warn("Message flagged by Moderations API."),
                         Warn(f"Flagged categories: {self.messages[msg_index].moderation.categories.get_flagged_categories()}")
