@@ -371,7 +371,7 @@ class ConversationDatabaseManager(DatabaseManager):
                     cat = mod.categories
                     self.cursor.execute(
                         """
-                    INSERT INTO moderations (message_id, flagged, moderations, harassment, harassment_threatening,
+                    INSERT INTO moderations (message_id, flagged, moderated, harassment, harassment_threatening,
                                              sexual, hate, hate_threatening, illicit, illicit_violent,
                                              self_harm_intent, self_harm_instruction, self_harm,
                                              sexual_minors, violence, violence_graphic, banned_word)
