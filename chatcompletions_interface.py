@@ -90,10 +90,10 @@ class ChatCompletions(classes.Model):
                                     )
                                     continue
                                 message_to_add["content"].append(
-                                    {"type": "file", "file": {
+                                    {"type": "input_audio", "input_audio": {
                                         # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
+                                        "data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "format": data_format,
                                     }}
                                 )
                             case "input_video":
@@ -103,10 +103,9 @@ class ChatCompletions(classes.Model):
                                     )
                                     continue
                                 message_to_add["content"].append(
-                                    {"type": "file", "file": {
+                                    {"type": "video_url", "video_url": {
                                         # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
+                                        "url": f"data:video/{data_format};base64,{base64.b64encode(attachment.data).decode('utf-8')}"
                                     }}
                                 )
                             case "file":

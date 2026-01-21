@@ -2,7 +2,7 @@ from objlog.LogMessages import Debug
 
 import classes
 import ollama_model_interface
-import responses_interface
+import chatcompletions_interface
 import constants
 import re
 import asyncio
@@ -205,7 +205,7 @@ def main() -> None:
             name=constants.OLLAMA_MODEL_NAME, system_prompt=None
         )
         if not use_remote
-        else responses_interface.Responses(
+        else chatcompletions_interface.ChatCompletions(
             system_prompt=None, api_key=constants.REMOTE_AUTH_API_KEY
         )
     )

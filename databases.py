@@ -194,15 +194,16 @@ class ConversationDatabaseManager(DatabaseManager):
             attachments = []
             for row in rows:
                 attachment_type, filename, url, data = row
+                format = filename.split('.')[-1].lower()
                 match attachment_type:
                     case ImageAttachment.__name__:
                         attachment = ImageAttachment(filename=filename, url=url, data=data)
                     case TextAttachment.__name__:
                         attachment = TextAttachment(filename=filename, data=data)
                     case AudioAttachment.__name__:
-                        attachment = AudioAttachment(filename=filename, data=data)
+                        attachment = AudioAttachment(filename=filename, data=data, file_format=format)
                     case VideoAttachment.__name__:
-                        attachment = VideoAttachment(filename=filename, data=data)
+                        attachment = VideoAttachment(filename=filename, data=data, file_format=format)
                     case _:
                         constants.MAIN_LOG.log(Error(f"Unknown attachment type: {attachment_type}"))
                         continue

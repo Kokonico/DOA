@@ -1,5 +1,7 @@
 import base64
 
+from sympy import true
+
 # import objlog.utils
 
 import classes
@@ -30,11 +32,12 @@ class Responses(classes.Model):
         self.api_key = api_key
         self.source_url = api_source if api_source else self.source_url
 
-    # @objlog.utils.monitor(REMOTE_LOG, True, True)
+    # python
     def generate_response(
             self, conversation: classes.Conversation
     ) -> classes.AntonMessage:
         """Generate a response using the responses API based on the conversation history."""
+        # TODO: very broken! fix someday lmao (not today)
         constants.REMOTE_LOG.log(
             Info("Generating response using Responses API.")
         )
@@ -49,8 +52,10 @@ class Responses(classes.Model):
             if len(message.attachments) > 0:
                 MAIN_LOG.log(Debug(f"MESSAGE ATTACHMENTS: {message.attachments}"))
             role = "assistant" if isinstance(message, classes.AntonMessage) else "user"
-            content_item_type = "output_text" if isinstance(message, classes.AntonMessage) else "input_text"
-            message_to_add = {"role": role, "type": "message", "content": [{"type": content_item_type, "text": str(message)}]}
+            # use API-expected content type discriminator
+            content_item_type = "output" if isinstance(message, classes.AntonMessage) else "input"
+            message_to_add = {"role": role, "type": "message",
+                              "content": [{"type": content_item_type + "_text", "text": str(message)}]}
             # Handle attachments (if is the last message in the conversation)
             if message == conversation.messages[-1] and not isinstance(message, classes.AntonMessage):
                 for attachment in message.attachments:
@@ -62,10 +67,10 @@ class Responses(classes.Model):
                         type = "text"
                     elif isinstance(attachment, classes.AudioAttachment):
                         type = "input_audio"
-                        data_format = attachment.format.split("/")[-1]  # get format without "audio/"
+                        data_format = attachment.format.split("/")[-1].lower()  # get format without "audio/"
                     elif isinstance(attachment, classes.VideoAttachment):
                         type = "input_video"
-                        data_format = attachment.format.split("/")[-1]  # get format without "video/"
+                        data_format = attachment.format.split("/")[-1].lower()  # get format without "video/"
                     elif isinstance(attachment, PDFAttachment):
                         type = "file"
 
@@ -78,23 +83,23 @@ class Responses(classes.Model):
                                     )
                                     continue
                                 message_to_add["content"].append(
-                                    {"type": "image_url", "image_url": {"url": attachment.url}}
+                                    {"type": content_item_type+"_image", "image_url": f"data:image/{data_format};base64,{base64.b64encode(attachment.data).decode('utf-8')}"}
                                 )
                             case "text":
+                                # keep as input_text for text attachments on user messages
                                 message_to_add["content"].append(
-                                    {"type": content_item_type, "text": attachment.data.decode('utf-8')}
+                                    {"type": content_item_type+"_text", "text": attachment.data.decode('utf-8')}
                                 )
                             case "input_audio":
-                                if not constants.DOA_FEATURE_FLAGS["audio_support"]:
+                                if not constants.DOA_FEATURE_FLAGS["audio_support"] or true:  # temporarily disable audio support as responses API does not support it yet
                                     constants.REMOTE_LOG.log(
-                                        Warn("Audio attachments are not supported, skipping audio attachment.")
+                                        Warn("Audio attachments are not supported, skipping audio attachment.") # TODO support audio attachments when r
                                     )
                                     continue
                                 message_to_add["content"].append(
-                                    {"type": "file", "file": {
-                                        # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
+                                    {"type": content_item_type+"_audio", "audio": {
+                                        "data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "format": data_format,
                                     }}
                                 )
                             case "input_video":
@@ -104,10 +109,9 @@ class Responses(classes.Model):
                                     )
                                     continue
                                 message_to_add["content"].append(
-                                    {"type": "file", "file": {
-                                        # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
+                                    {"type": content_item_type+"_video", "video": {
+                                        "data": base64.b64encode(attachment.data).decode('utf-8'),
+                                        "format": data_format,
                                     }}
                                 )
                             case "file":
@@ -117,18 +121,14 @@ class Responses(classes.Model):
                                     )
                                     continue
                                 message_to_add["content"].append(
-                                    {"type": "file", "file": {
-                                        # convert to base64
-                                        "file_data": base64.b64encode(attachment.data).decode('utf-8'),
-                                        "filename": attachment.filename,
-                                    }}
+                                    {"type": content_item_type+"_file", "file_data": f"data:application/pdf;base64,{base64.b64encode(attachment.data).decode('utf-8')}"}
                                 )
                             case _:
                                 constants.REMOTE_LOG.log(
                                     Warn(f"Unsupported attachment type: {type}, assuming text.")
                                 )
                                 message_to_add["content"].append(
-                                    {"type": "text", "text": attachment.data.decode('utf-8')}
+                                    {"type": content_item_type+"_text", "text": attachment.data.decode('utf-8')}
                                 )
 
             message_history.append(message_to_add)
@@ -137,8 +137,9 @@ class Responses(classes.Model):
 
         payload = {
             "model": self.name,
-            "input": [{"type": "message", "role": "system", "content": [{"type": "input_text", "text": constants.system_prompt() if self.system_prompt is None else self.system_prompt}]}]
-                        + message_history,
+            "input": [{"type": "message", "role": "system", "content": [{"type": "input_text",
+                                                                         "text": constants.system_prompt() if self.system_prompt is None else self.system_prompt}]}]
+                     + message_history,
         }
 
         constants.REMOTE_LOG.log(Debug(f"Responses API request payload: {payload}"))
