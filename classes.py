@@ -339,8 +339,7 @@ class Model:
 
     def __init__(self, name: str, system_prompt: str | None) -> None:
         self.name = name if name else self.name
-        if system_prompt:
-            self.system_prompt = system_prompt
+        self.system_prompt = system_prompt
 
     def generate_response(self, conversation: Conversation) -> AntonMessage:
         raise NotImplementedError("Subclasses must implement this method.")

@@ -1,6 +1,7 @@
 """constants for daughter of anton"""
 
 import os
+import platform
 import sys
 import time
 from datetime import datetime
@@ -9,6 +10,8 @@ from dotenv import load_dotenv
 
 from objlog import LogNode
 from objlog.LogMessages import Debug, Info, Warn, Error, Fatal
+
+import psutil
 
 use_remote = True  # Set to False for local model interface
 
@@ -26,7 +29,7 @@ OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True)
 REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True)
 
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
-REMOTE_MODEL_NAME = "openai/gpt-5.1"
+REMOTE_MODEL_NAME = "openai/gpt-5.2"
 
 REMOTE_TIMEOUT_SECONDS = 600  # 10 minutes, some AI models take a while to respond
 
@@ -146,8 +149,14 @@ def system_prompt():
 
     ## Other data:
     - You are powered by {f"the Ollama {OLLAMA_MODEL_NAME} model." if not use_remote else f"{REMOTE_MODEL_NAME}."}
-    - You are running on a computer running {os.name}.
-    - You are running python version {sys.version}.
+    - You are running on a computer running {platform.platform(terse=True)} ({platform.system()} {platform.release()}) architecture {platform.machine()}.
+    - System specs:
+        - Processor: {psutil.cpu_freq().max} MHz {platform.processor()}
+        - RAM: {round(psutil.virtual_memory().total / (1024 ** 3), 2)} GB
+        - Disk Space (Total): {round(psutil.disk_usage('/').total / (1024 ** 3), 2)} GB
+        - Disk Space (Free): {round(psutil.disk_usage('/').free / (1024 ** 3), 2)} GB
+        - Disk Space (Used): {round(psutil.disk_usage('/').total / (1024 ** 3), 2) - round(psutil.disk_usage('/').free / (1024 ** 3), 2)} GB
+    - You are running on {platform.python_implementation()} {platform.python_version()}.
     """
     MAIN_LOG.log(Debug("System prompt reloaded."))
     MAIN_LOG.log(Debug(f"Uptime: {uptime_hours}h {uptime_minutes}m {uptime_seconds}s"))
