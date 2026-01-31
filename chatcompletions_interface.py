@@ -53,23 +53,23 @@ class ChatCompletions(classes.Model):
             # Handle attachments (if is the last message in the conversation)
             if message == conversation.messages[-1] and not isinstance(message, classes.AntonMessage):
                 for attachment in message.attachments:
-                    type = None
+                    attachment_type = None
                     data_format = None
                     if isinstance(attachment, classes.ImageAttachment):
-                        type = "image_url"
+                        attachment_type = "image_url"
                     elif isinstance(attachment, classes.TextAttachment):
-                        type = "text"
+                        attachment_type = "text"
                     elif isinstance(attachment, classes.AudioAttachment):
-                        type = "input_audio"
+                        attachment_type = "input_audio"
                         data_format = attachment.format.split("/")[-1]  # get format without "audio/"
                     elif isinstance(attachment, classes.VideoAttachment):
-                        type = "input_video"
+                        attachment_type = "input_video"
                         data_format = attachment.format.split("/")[-1]  # get format without "video/"
                     elif isinstance(attachment, PDFAttachment):
-                        type = "file"
+                        attachment_type = "file"
 
-                    if type:
-                        match type:
+                    if attachment_type:
+                        match attachment_type:
                             case "image_url":
                                 if not constants.DOA_FEATURE_FLAGS["image_support"]:
                                     constants.REMOTE_LOG.log(
@@ -123,7 +123,7 @@ class ChatCompletions(classes.Model):
                                 )
                             case _:
                                 constants.REMOTE_LOG.log(
-                                    Warn(f"Unsupported attachment type: {type}, assuming text.")
+                                    Warn(f"Unsupported attachment type: {attachment_type}, assuming text.")
                                 )
                                 message_to_add["content"].append(
                                     {"type": "text", "text": attachment.data.decode('utf-8')}
@@ -139,9 +139,8 @@ class ChatCompletions(classes.Model):
                         + message_history,
         }
 
-        constants.REMOTE_LOG.log(Debug(f"Chat Completions request payload: {payload}"))
-        # remove any system messages from the debug log for readability
-        constants.REMOTE_LOG.log(Debug(f"No system prompt: {message_history}"))
+        constants.REMOTE_LOG.log(Debug(f"Chat Completions request payload assembled"))
+        # note: DON'T PRINT THE PAYLOAD, IT'S HUGE!
         constants.REMOTE_LOG.log(
             Info(f"Sending request to Chat Completions API at {self.source_url}")
         )

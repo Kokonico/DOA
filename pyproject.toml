@@ -10,10 +10,10 @@ readme = "README.md"
 python = "^3.13"
 ollama = "^0.6.1"
 discord-py = "^2.6.4"
-objlog = "^3.0.4"
+objlog = "^3.0.5"
 python-dotenv = "^1.2.1"
 requests = "^2.32.5"
-psutil = "^7.2.1"
+psutil = "^7.2.2"
 
 
 [build-system]
