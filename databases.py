@@ -622,7 +622,8 @@ class ConversationDatabaseManager(DatabaseManager):
                         user_id=author_id,
                         user_name=message.author.name,
                         nick=message.author.nick,
-                        last_message_uuid=message.uuid,
+                        # Keep last_message_uuid as a profile-notes freshness marker.
+                        last_message_uuid=None,
                         last_seen_at=int(message.timestamp),
                     )
 

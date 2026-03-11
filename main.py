@@ -7,6 +7,7 @@ import constants
 import re
 import asyncio
 import databases
+from collections import Counter
 
 import discord
 from discord import app_commands
@@ -408,6 +409,164 @@ def main() -> None:
             deleted = await interaction.channel.purge(check=is_bot_message)
             # no confirmation message, just silently delete, it'll be obvious
             constants.MAIN_LOG.log(constants.Info(f"Nuked {len(deleted)} bot messages"))
+
+        # takes 1 optional argument: user
+        @tree.command(
+            name="get_profile",
+            description="Get a user's profile, statistics & moderation history."
+        )
+        @app_commands.describe(user="User to look up (optional)")
+        async def get_profile(interaction: discord.Interaction, user: discord.User = None):
+
+            await interaction.response.defer(thinking=True)
+
+            target = user or interaction.user
+            member = None
+            if interaction.guild is not None:
+                member = interaction.guild.get_member(target.id)
+
+            history = db_manager.get_user_history(int(target.id))
+            profile = history.profile
+            messages_hist = history.messages
+            moderations_hist = history.moderations
+
+            latest_message_uuid = messages_hist[-1].uuid if messages_hist else None
+            latest_message_timestamp = int(messages_hist[-1].timestamp) if messages_hist else None
+
+            category_display_names = {
+                "harassment": "Harassment",
+                "harassment_threats": "Harassment Threats",
+                "sexual_content": "Sexual Content",
+                "hate": "Hate",
+                "hate_threat": "Hate Threat",
+                "illicit": "Illicit",
+                "illicit_violent": "Illicit Violent",
+                "self_harm_intent": "Self Harm Intent",
+                "self_harm_instruction": "Self Harm Instruction",
+                "self_harm": "Self Harm",
+                "sexual_minors": "Sexual Minors",
+                "violence": "Violence",
+                "violence_graphic": "Violence Graphic",
+            }
+
+            category_counts: Counter[str] = Counter()
+            for moderation_entry in moderations_hist:
+                if not moderation_entry.moderation.flagged:
+                    continue
+                for category in moderation_entry.moderation.categories.get_flagged_categories():
+                    category_counts[category] += 1
+
+            should_refresh_notes = False
+            if profile is None:
+                should_refresh_notes = True
+            elif not profile.notes or not profile.notes.strip():
+                should_refresh_notes = True
+            elif latest_message_uuid and profile.last_message_uuid != latest_message_uuid:
+                should_refresh_notes = True
+
+            if should_refresh_notes:
+                recent_messages = messages_hist[-8:]
+                recent_message_snippets = "\n".join(
+                    [f"- {(msg.content or '').replace(chr(10), ' ')[:180]}" for msg in recent_messages]
+                )
+                if not recent_message_snippets:
+                    recent_message_snippets = "- No message history available."
+
+                category_summary_for_prompt = ", ".join(
+                    [
+                        f"{count}x({category_display_names.get(category, category.replace('_', ' ').title())})"
+                        for category, count in sorted(
+                        category_counts.items(), key=lambda item: (-item[1], item[0])
+                    )
+                    ]
+                ) or "None"
+
+                profile_prompt = (
+                    "Write a concise, friendly profile blurb (2-4 sentences) for a Discord user based on activity stats. "
+                    "Avoid sensitive assumptions and keep tone neutral but personable.\n\n"
+                    f"Username: {target.name}\n"
+                    f"Display name: {target.display_name}\n"
+                    f"Total messages: {len(messages_hist)}\n"
+                    f"Times flagged: {sum(1 for m in moderations_hist if m.moderation.flagged)}\n"
+                    f"Moderation categories: {category_summary_for_prompt}\n"
+                    "Recent messages:\n"
+                    f"{recent_message_snippets}"
+                )
+
+                generated_notes = None
+                try:
+                    generated_notes = await asyncio.to_thread(
+                        model.basic_chat,
+                        profile_prompt,
+                        "You generate short user profile blurbs for a Discord bot command.",
+                    )
+                except Exception:
+                    try:
+                        fallback_conv = classes.Conversation()
+                        fallback_conv.add_message(
+                            classes.Message(
+                                content=profile_prompt,
+                                author=classes.Person(name="Profile Generator"),
+                            )
+                        )
+                        fallback_response = await asyncio.to_thread(
+                            model.generate_response, fallback_conv
+                        )
+                        generated_notes = fallback_response.content
+                    except Exception as e:
+                        constants.MAIN_LOG.log(
+                            constants.Warn(
+                                f"Failed to generate profile notes for user {target.id}: {e}"
+                            )
+                        )
+
+                final_notes = (generated_notes or "").strip()
+                if not final_notes:
+                    final_notes = (
+                        profile.notes
+                        if profile and profile.notes
+                        else "No notes available yet for this user."
+                    )
+
+                users_db_manager.upsert_user(
+                    user_id=int(target.id),
+                    user_name=target.name,
+                    nick=member.nick if member else None,
+                    notes=final_notes,
+                    last_message_uuid=latest_message_uuid,
+                    last_seen_at=latest_message_timestamp,
+                )
+                profile = users_db_manager.get_user_profile(int(target.id))
+
+            total_messages = len(messages_hist)
+            # times_moderated = sum(1 for m in moderations_hist if m.moderation.moderated)
+            times_flagged = sum(1 for m in moderations_hist if m.moderation.flagged)
+
+            moderation_breakdown = " ".join(
+                [
+                    f"{count}x({category_display_names.get(category, category.replace('_', ' ').title())})"
+                    for category, count in sorted(
+                    category_counts.items(), key=lambda item: (-item[1], item[0])
+                )
+                ]
+            ) or "None"
+
+            profile_display_name = member.display_name if member else target.display_name
+            embed = discord.Embed(
+                title=f"{profile_display_name}'s Profile",
+                description=("DOA's Notes:\n" + (
+                    profile.notes if profile and profile.notes else "No profile notes available yet.")),
+                color=discord.Color.blurple(),
+            )
+            # embed.add_field(name="User", value=f"{target.mention} (`{target.id}`)", inline=False)
+            embed.add_field(name="Total Messages", value=str(total_messages), inline=True)
+            # embed.add_field(name="Times Moderated", value=str(times_moderated), inline=True)
+            embed.add_field(name="Times Flagged", value=str(times_flagged), inline=True)
+            embed.add_field(name="Moderation Breakdown", value=moderation_breakdown, inline=False)
+
+            embed.set_thumbnail(url=target.display_avatar.url)
+            await interaction.followup.send(embed=embed)
+
 
     # Run the Discord bot
     client.run(constants.DISCORD_BOT_TOKEN)
