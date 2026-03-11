@@ -343,3 +343,6 @@ class Model:
 
     def generate_response(self, conversation: Conversation) -> AntonMessage:
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def basic_chat(self, message: str, appended_system_prompt: str | None = None) -> str:
+        raise NotImplementedError("Subclasses must implement this method.")

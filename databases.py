@@ -122,6 +122,20 @@ class ConversationDatabaseManager(DatabaseManager):
                 """
             )
 
+            # initialize authors
+            self.cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS authors (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                nick TEXT,
+                notes TEXT
+            )
+            """
+            ) # notes are written by DOA about the author, e.g. "frequent user", "toxic user", "enjoys memes", etc. they can be quite long if DOA wants.
+            # also, primary key won't auto increment here, use discord user ID or similar for consistency.
+
+
             self.connection.commit()
             constants.MAIN_LOG.log(Info("Database tables initialized successfully."))
         except sqlite3.Error as e:
@@ -525,6 +539,55 @@ class ConversationDatabaseManager(DatabaseManager):
             self.connection.close()
             constants.MAIN_LOG.log(Info("Database connection closed."))
             self.connected = False
+
+class UserProfileManager(DatabaseManager):
+    """
+    Manages profiles of users in the database.
+    """
+
+    db_path = constants.CACHE_DATABASE_FILE
+
+    connection: Connection | None = None
+    cursor: Cursor | None = None
+    connected: bool = False
+
+    def initialize_tables(self) -> None:
+        """Create necessary tables for User profiles."""
+        # must store the following:
+        # 1. user ID (primary key)
+        # 2. name
+        # 3. nick
+        # 4. notes (written by DOA about the user, e.g. "frequent user", "toxic user", "enjoys memes", etc. they can be quite long if DOA wants.)
+        # 5. incidents, the ID's to every moderation affecting a message from them (for easy retrieval when DOA wants to review a user or something, also can be used to roast them lolol)
+        if not self.connected:
+            constants.MAIN_LOG.log(
+                Error("Database not connected. Cannot initialize user profile tables.")
+            )
+            return
+        try:
+            self.cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS user_profiles (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                nick TEXT,
+                notes TEXT,
+                incidents 
+            )
+            """
+            )
+            self.connection.commit()
+            constants.MAIN_LOG.log(
+                Info("User profile tables initialized successfully.")
+            )
+        except sqlite3.Error as e:
+            constants.MAIN_LOG.log(
+                Error(f"Error initializing user profile tables: {e}")
+            )
+            raise e
+
+
+
 
 class DiscordDataCacher(DatabaseManager):
     """

@@ -166,3 +166,36 @@ class ChatCompletions(classes.Model):
         return classes.AntonMessage(
             content=response_data["choices"][0]["message"]["content"]
         )
+
+    def basic_chat(self, message: str, appended_system_prompt: str | None = None) -> str:
+        """A basic chat method that sends a single message and gets a response."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        messages = [
+            {"role": "system", "content": constants.system_prompt()}
+        ]
+        if appended_system_prompt is not None:
+            messages.append({"role": "system", "content": appended_system_prompt})
+        messages.append({"role": "user", "content": [{"type": "text", "text": message}]})
+
+        response = requests.post(
+            self.source_url + "/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": self.name,
+                "messages": messages
+            },
+            timeout=constants.REMOTE_TIMEOUT_SECONDS
+        )
+
+        if response.status_code != 200:
+            constants.REMOTE_LOG.log(Error(f"Error from Chat Completions API: {response.status_code} - {response.text}"))
+            raise Exception(f"Chat Completions API error: {response.status_code}")
+        response_data = response.json()
+        constants.REMOTE_LOG.log(
+            Debug(f"Chat Completions response content: {response_data}")
+        )
+        return response_data["choices"][0]["message"]["content"]

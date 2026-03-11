@@ -379,7 +379,7 @@ def main() -> None:
             description="Completely delete the bot's conversation history and messages for this channel.",
         )
         async def nuke_bot_messages(interaction: discord.Interaction):
-            # check if i have manage_messages permission in this channel
+            # check if I have manage_messages permission in this channel
             if isinstance(interaction.channel, discord.DMChannel):
                 await interaction.response.send_message(
                     "This command cannot be used in direct messages.", ephemeral=True
