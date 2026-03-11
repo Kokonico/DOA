@@ -5,9 +5,11 @@ from __future__ import annotations
 import datetime
 import uuid
 import requests
+from dataclasses import dataclass
 
 import constants
-from constants import MAIN_LOG, REMOTE_LOG, Info, Warn, Error, Debug
+from constants import MAIN_LOG, REMOTE_LOG
+from objlog.LogMessages import Info, Warn, Error, Debug
 
 
 # conversational classes
@@ -19,10 +21,68 @@ class Person:
     id: str
     nick: str | None = None
 
-    def __init__(self, name: str, nick: str | None = None) -> None:
+    def __init__(self, name: str, nick: str | None = None, user_id: str | None = None) -> None:
         self.name = name
         self.nick = nick
-        self.id = str(uuid.uuid4())
+        self.id = user_id if user_id else str(uuid.uuid4())
+
+
+@dataclass
+class UserProfile:
+    """Structured profile information loaded from users.db."""
+
+    user_id: int
+    name: str
+    nick: str | None = None
+    notes: str | None = None
+    last_message_uuid: str | None = None
+    last_seen_at: int | None = None
+
+
+@dataclass
+class UserMessageHistoryEntry:
+    """Single persisted message row authored by a user."""
+
+    message_id: int
+    conversation_id: int
+    uuid: str
+    content: str
+    timestamp: int
+    author_name: str
+    author_nick: str | None
+
+
+@dataclass
+class UserModerationHistoryEntry:
+    """Moderation record tied to one authored message."""
+
+    message_id: int
+    conversation_id: int
+    uuid: str
+    timestamp: int
+    moderation: "ModerationResult"
+
+
+@dataclass
+class UserHistoryBundle:
+    """Combined profile and historical records for one user."""
+
+    profile: UserProfile | None
+    messages: list[UserMessageHistoryEntry]
+    moderations: list[UserModerationHistoryEntry]
+
+
+class Person_Profile:
+    """Backward-compatible alias for legacy code paths."""
+
+    person: Person
+    description: str
+    moderations: list[str]
+
+    def __init__(self, person: Person, description: str, moderations: list[str]) -> None:
+        self.person = person
+        self.description = description
+        self.moderations = moderations
 
 
 class DaughterOfAnton(Person):
@@ -342,4 +402,7 @@ class Model:
         self.system_prompt = system_prompt
 
     def generate_response(self, conversation: Conversation) -> AntonMessage:
+        raise NotImplementedError("Subclasses must implement this method.")
+
+    def basic_chat(self, message: str, appended_system_prompt: str | None = None) -> str:
         raise NotImplementedError("Subclasses must implement this method.")

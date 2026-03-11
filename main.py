@@ -13,8 +13,10 @@ from discord import app_commands
 
 from classes import Message, AudioAttachment, TextAttachment, VideoAttachment, ImageAttachment, PDFAttachment
 
-db_manager = databases.ConversationDatabaseManager(constants.DATABASE_FILE)
-db_cache_manager = databases.DiscordDataCacher(constants.CACHE_DATABASE_FILE)
+users_db_manager = databases.UsersDatabaseManager(constants.USERS_DATABASE_FILE)
+db_manager = databases.ConversationDatabaseManager(
+    constants.DATABASE_FILE, users_manager=users_db_manager
+)
 
 use_remote = constants.use_remote
 
@@ -42,7 +44,7 @@ async def swap_mentions(
 
         if mention.isdigit():
             # proper mention format, swap to username
-            cache_lookup = db_cache_manager.get_user_by_id(int(mention))
+            cache_lookup = users_db_manager.get_user_by_id(int(mention))
             if cache_lookup:
                 mention_str = f"<@{mention}>"
                 content = content.replace(mention_str, f"<@{cache_lookup}>").strip()
@@ -52,7 +54,7 @@ async def swap_mentions(
                 user = await client.fetch_user(int(mention))
                 if user:
                     # save to cache
-                    db_cache_manager.cache_user(int(mention), user.name)
+                    users_db_manager.cache_user(int(mention), user.name)
                     mention_str = f"<@{mention}>"
                     content = content.replace(mention_str, f"<@{user.name}>").strip()
             except discord.errors.NotFound:
@@ -72,7 +74,7 @@ async def swap_mentions(
                         break
             else:
                 # load from cache first
-                cache_lookup = db_cache_manager.get_user_by_id(mention)
+                cache_lookup = users_db_manager.get_user_by_name(mention)
                 if cache_lookup:
                     mention_str = f"<@{mention}>"
                     content = content.replace(mention_str, f"<@{cache_lookup}>").strip()
@@ -80,7 +82,7 @@ async def swap_mentions(
                 user = discord.utils.get(message.guild.members, name=mention)
             if user:
                 # save to cache
-                db_cache_manager.cache_user(user.id, mention)
+                users_db_manager.cache_user(user.id, mention)
                 mention_str = f"<@{mention}>"
                 content = content.replace(mention_str, f"<@{user.id}>").strip()
     return content
@@ -99,7 +101,11 @@ async def convert_message(message: discord.Message, client: discord.Client, is_c
     if not nick:
         # check universal discord nickname
         nick = author.display_name
-    person = classes.Person(name=message.author.name, nick=nick if nick and nick != "" else None)
+    person = classes.Person(
+        name=message.author.name,
+        nick=nick if nick and nick != "" else None,
+        user_id=str(message.author.id),
+    )
     msg = classes.Message()
     msg.content = await swap_mentions(message.content, client, message)
     msg.author = person
@@ -379,7 +385,7 @@ def main() -> None:
             description="Completely delete the bot's conversation history and messages for this channel.",
         )
         async def nuke_bot_messages(interaction: discord.Interaction):
-            # check if i have manage_messages permission in this channel
+            # check if I have manage_messages permission in this channel
             if isinstance(interaction.channel, discord.DMChannel):
                 await interaction.response.send_message(
                     "This command cannot be used in direct messages.", ephemeral=True
