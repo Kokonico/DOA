@@ -2,7 +2,7 @@
 
 ## Big picture
 
-- `main.py` is the runtime entrypoint. It creates global SQLite managers for `DOA.db` and `cache.db`, picks the model
+- `main.py` is the runtime entrypoint. It creates global SQLite managers for `DOA.db` and `users.db`, picks the model
   backend from `constants.use_remote`, and wires Discord events plus slash commands.
 - Request flow in `main.py`: `on_message()` -> `swap_mentions()` -> `convert_message()` ->
   `ConversationDatabaseManager.load_conversation()` -> add up to 10 prior non-bot/non-mention channel messages as
@@ -13,9 +13,11 @@
   `Message.__str__()` is the canonical prompt serialization format, including reply chains as
   `(replying to: ...) author\\/\\nick: content`.
 - Persistence is channel-scoped in `databases.py`: the Discord channel ID is the conversation ID. Context messages are
-  never persisted; attachments and moderation rows are persisted alongside messages.
-- `cache.db` is not conversation history: `DiscordDataCacher` only caches Discord user ID <-> username mappings so
-  mention swapping can work without always refetching users.
+  never persisted; attachments and moderation rows are persisted alongside messages, and authored Discord user IDs are
+  upserted into `users.db` while saving.
+- `users.db` is not conversation history: `UsersDatabaseManager` is the active identity/profile store (ID <-> username
+  mapping plus profile metadata like `notes`, `last_message_uuid`, `last_seen_at`) used by mention swapping and user
+  history lookup APIs in `ConversationDatabaseManager`.
 
 ## Backends and integrations
 
@@ -34,6 +36,8 @@
 - Most runtime config lives in `constants.py`, not `.env`. `.env` is only for `DOA_DISCORD_BOT_TOKEN` and
   `DOA_REMOTE_API_KEY`; model names, feature flags, remote URL, moderation toggle, and prompt behavior are hard-coded in
   `constants.py`.
+- `constants.CACHE_DATABASE_FILE` still exists as a legacy constant, but runtime mention caching/profile lookups now use
+  `constants.USERS_DATABASE_FILE` via `UsersDatabaseManager`.
 - Importing `constants.py` exits the process if `DOA_DISCORD_BOT_TOKEN` is unset. Any script or smoke test that imports
   project modules needs that env var present.
 - `constants.system_prompt()` is dynamic: it embeds uptime, current date/time, platform info, Python version, model
@@ -59,7 +63,8 @@
 - Keep raw Discord objects at the edge (`main.py`). Downstream code expects the internal `classes.Message` /
   `Conversation` model, not `discord.Message` instances.
 - Mention formatting is fragile and important: prompts use `<@username>` text, Discord delivery uses numeric mentions,
-  and `swap_mentions()` + `DiscordDataCacher` bridge the two. Changes there affect both prompt quality and outbound
+  and `swap_mentions()` + `UsersDatabaseManager` bridge the two (`DiscordDataCacher` is only a backward-compatible
+  alias). Changes there affect both prompt quality and outbound
   pings.
 - Preserve the channel-history contract: `/induce_dementia` clears stored conversation for one channel,
   `/nuke_bot_messages` also purges the bot’s sent messages in that channel, and `clear_context()` prevents the transient
