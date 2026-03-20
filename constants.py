@@ -24,9 +24,9 @@ DATABASE_FILE = "DOA.db"
 CACHE_DATABASE_FILE = "cache.db"
 USERS_DATABASE_FILE = "users.db"
 
-MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE, print_to_console=True)
-OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True)
-REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True)
+MAIN_LOG = LogNode("MAIN", log_file=LOG_FILE, print_to_console=True, asynchronous=True)
+OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True, asynchronous=True)
+REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True, asynchronous=True)
 
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
 REMOTE_MODEL_NAME = "google/gemini-3-flash-preview"

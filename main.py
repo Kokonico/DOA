@@ -573,4 +573,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Cleaning up...")
+    # close logs with grace
+    constants.MAIN_LOG.await_finish()
+    constants.REMOTE_LOG.await_finish()
+    constants.OLLAMA_LOG.await_finish()
