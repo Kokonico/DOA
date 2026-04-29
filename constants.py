@@ -48,7 +48,8 @@ ENABLE_MODERATION = True
 MODERATION_WORDLIST = [
     "goon",
     "gooning",
-    "disestablishmentarianism"  # lmao
+    "disestablishmentarianism",  # lmao
+    "reggin" # i cant trust people
 ]
 
 DISCORD_BOT_TOKEN = os.getenv("DOA_DISCORD_BOT_TOKEN", None)
