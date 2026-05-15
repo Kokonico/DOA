@@ -48,7 +48,8 @@ ENABLE_MODERATION = True
 MODERATION_WORDLIST = [
     "goon",
     "gooning",
-    "disestablishmentarianism"  # lmao
+    "disestablishmentarianism",  # lmao
+    "reggin" # i cant trust people
 ]
 
 # guilds DOA will not engage with, if added, will leave.
