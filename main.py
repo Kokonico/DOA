@@ -223,10 +223,34 @@ def main() -> None:
         await tree.sync()
         constants.MAIN_LOG.log(constants.Info(f"Logged in as {client.user}"))
 
+    # on join guild
+    async def on_guild_join(guild: discord.Guild):
+        if guild.id in constants.BANNED_GUILDS:
+            constants.MAIN_LOG.log(
+                constants.Warn(f"Joined banned guild {guild.name} ({guild.id}), leaving...")
+            )
+            # send a message statingwhy I'm leaving, if possible (if I have permissions to send messages in any channel, send it in the first channel I can send messages in)
+            for channel in guild.text_channels:
+                if channel.permissions_for(guild.me).send_messages:
+                    try:
+                        await channel.send(
+                            "Hello! I'd love to be here, but it appears this server is on my blocklist! You probably did something to me at some point. Bye!"
+                        )
+                    except Exception as e:
+                        constants.MAIN_LOG.log(
+                            constants.Warn(f"Failed to send leave message in guild {guild.name} ({guild.id}): {e}")
+                        )
+                    break
+            await guild.leave()
+        else:
+            constants.MAIN_LOG.log(
+                constants.Info(f"Joined guild {guild.name} ({guild.id})")
+            )
+
     @client.event
     async def on_message(message: discord.Message):
-        if message.author == client.user:
-            return  # Ignore messages from the bot itself
+        if message.author == client.user or message.author.id in constants.BANNED_USERS:
+            return  # Ignore messages from the bot itself or anybody within the nonallowed list
         # Only respond to messages that mention the bot in guild channels, or any message in DMs, or replies to the bot SPECIFICALLY
         replies_to_bot = False
         ref_message = None

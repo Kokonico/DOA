@@ -51,6 +51,16 @@ MODERATION_WORDLIST = [
     "disestablishmentarianism"  # lmao
 ]
 
+# guilds DOA will not engage with, if added, will leave.
+BANNED_GUILDS = [
+    1495366738970153080  # some stupid people who kept making DOA get stuck in an infinite recursion loop
+]
+
+# users DOA will not engage with, if referenced, will ignore
+BANNED_USERS = [
+    1469108697233100972  # stupid bot
+]
+
 DISCORD_BOT_TOKEN = os.getenv("DOA_DISCORD_BOT_TOKEN", None)
 REMOTE_AUTH_API_KEY = os.getenv("DOA_REMOTE_API_KEY", None)
 
