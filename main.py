@@ -229,7 +229,7 @@ def main() -> None:
             constants.MAIN_LOG.log(
                 constants.Warn(f"Joined banned guild {guild.name} ({guild.id}), leaving...")
             )
-            # send a message statingwhy I'm leaving, if possible (if I have permissions to send messages in any channel, send it in the first channel I can send messages in)
+            # send a message stating why I'm leaving, if possible (if I have permissions to send messages in any channel, send it in the first channel I can send messages in)
             for channel in guild.text_channels:
                 if channel.permissions_for(guild.me).send_messages:
                     try:
