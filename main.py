@@ -8,7 +8,9 @@ import re
 import asyncio
 import databases
 from collections import Counter
+from datetime import datetime
 
+import schedule
 import discord
 from discord import app_commands
 
@@ -22,6 +24,24 @@ db_manager = databases.ConversationDatabaseManager(
 use_remote = constants.use_remote
 
 commands_registered = False
+
+async def update_uptime(model: classes.Model, client: discord.Client):
+    """check if backend model is up, and update bot status accordingly"""
+    if model.health_check():
+        # we're good, set status to online
+        await set_status(f"Hello :)", discord.Status.online, client)
+    else:
+        # something's wrong with the model, set status to idle and log a warning
+        constants.MAIN_LOG.log(
+            constants.Warn(
+                "Health check failed: backend model is not responding. Setting status to idle."
+            )
+        )
+        await set_status(f"I'm dead right now :(, will be back soon!", discord.Status.do_not_disturb, client)
+
+async def set_status(text: str, mode: discord.Status, client: discord.Client):
+    await client.wait_until_ready()
+    await client.change_presence(status=mode, activity=discord.CustomActivity(name=text))
 
 
 async def swap_mentions(
@@ -222,6 +242,9 @@ def main() -> None:
         constants.MAIN_LOG.log(constants.Info("Bot is ready. Syncing commands..."))
         await tree.sync()
         constants.MAIN_LOG.log(constants.Info(f"Logged in as {client.user}"))
+        # set up a schedule to run update_uptime every 5 minutes
+        schedule.every(10).minutes.do(lambda: update_uptime(model, client))
+        await update_uptime(model, client)
 
     # on join guild
     async def on_guild_join(guild: discord.Guild):

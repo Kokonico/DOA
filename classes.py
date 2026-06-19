@@ -406,3 +406,7 @@ class Model:
 
     def basic_chat(self, message: str, appended_system_prompt: str | None = None) -> str:
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def health_check(self) -> bool:
+        """Check if the model is healthy and can generate responses."""
+        return True  # default implementation, can be overridden by subclasses

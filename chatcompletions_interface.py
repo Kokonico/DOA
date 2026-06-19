@@ -17,6 +17,7 @@ class ChatCompletions(classes.Model):
 
     name: str = constants.REMOTE_MODEL_NAME
     source_url: str = constants.REMOTE_SOURCE_URL
+    uptime_url: str = constants.REMOTE_SOURCE_UPTIME_URL
     api_key: str | None = None
 
     def __init__(
@@ -200,3 +201,12 @@ class ChatCompletions(classes.Model):
             Debug(f"Chat Completions response content: {response_data}")
         )
         return response_data["choices"][0]["message"]["content"]
+
+    def health_check(self) -> bool:
+        """Check if the API is healthy by sending a simple request."""
+        try:
+            response = requests.get(self.uptime_url, timeout=5)
+            return response.json()["status"] == "up"
+        except Exception as e:
+            constants.REMOTE_LOG.log(Error(f"Health check failed: {e}"))
+            return False
