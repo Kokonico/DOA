@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime
 import uuid
 import requests
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime as dt_datetime
+from typing import List, Optional, Dict, Any
 
 import constants
 from constants import MAIN_LOG, REMOTE_LOG
@@ -30,13 +32,76 @@ class Person:
 @dataclass
 class UserProfile:
     """Structured profile information loaded from users.db."""
-
     user_id: int
     name: str
     nick: str | None = None
     notes: str | None = None
     last_message_uuid: str | None = None
     last_seen_at: int | None = None
+    user_data: UserData | None = None
+
+
+@dataclass
+class Connection:
+    """A single connected account (Steam, Spotify, etc.)"""
+    type: str  # "steam", "spotify", "twitch", "youtube", etc.
+    id: str  # Platform-specific ID (SteamID64, Spotify URI, etc.)
+    name: Optional[str] = None  # Display name on that platform
+    visibility: int = 0  # Discord visibility setting (0 = hidden, 1 = public)
+    synced_at: Optional[dt_datetime] = None
+
+
+@dataclass
+class SteamData:
+    """Steam-specific data we can fetch after getting the connection"""
+    steamid64: str
+    persona_name: Optional[str] = None
+    profile_url: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    # Game related
+    owned_games: List[Dict[str, Any]] = field(default_factory=list)  # Full game objects from API
+    top_games: List[Dict[str, Any]] = field(default_factory=list)  # Sorted by playtime
+    recently_played: List[Dict[str, Any]] = field(default_factory=list)
+
+    last_updated: Optional[dt_datetime] = None
+
+
+@dataclass
+class SpotifyData:
+    """Optional: Spotify listening habits"""
+    display_name: Optional[str] = None
+    top_artists: List[Dict] = field(default_factory=list)
+    top_tracks: List[Dict] = field(default_factory=list)
+    last_listened: Optional[dt_datetime] = None
+
+
+@dataclass
+class Activity:
+    """Discord rich activity / presence"""
+    type: str  # playing, listening, etc.
+    name: str
+    time: int  # unix timestamp
+    details: Optional[str] = None
+    state: Optional[str] = None
+    timestamps: Optional[Dict] = None
+
+
+@dataclass
+class UserData:
+    """Main user data profile"""
+
+    nickname_history: List[str] = field(default_factory=list)
+    activity_history: List[Activity] = field(default_factory=list)
+
+    connections: List[Connection] = field(default_factory=list)
+
+    steam: Optional[SteamData] = None
+    spotify: Optional[SpotifyData] = None
+
+    def get_steam_connection(self) -> Optional[Connection]:
+        """Helper to quickly find Steam connection"""
+        return next((c for c in self.connections if c.type == "steam"), None)
 
 
 @dataclass
@@ -70,19 +135,6 @@ class UserHistoryBundle:
     profile: UserProfile | None
     messages: list[UserMessageHistoryEntry]
     moderations: list[UserModerationHistoryEntry]
-
-
-class Person_Profile:
-    """Backward-compatible alias for legacy code paths."""
-
-    person: Person
-    description: str
-    moderations: list[str]
-
-    def __init__(self, person: Person, description: str, moderations: list[str]) -> None:
-        self.person = person
-        self.description = description
-        self.moderations = moderations
 
 
 class DaughterOfAnton(Person):
@@ -318,7 +370,7 @@ class Conversation:
                         "type": "text",
                         "text": self.messages[msg_index].content
                     }
-                    messages_to_moderate_json = [msg_json]
+                    messages_to_moderate_json: list[dict[str, Any]] = [msg_json]
                     for attachment in self.messages[msg_index].attachments:
                         # only text attachments are supported for moderation for now
                         if isinstance(attachment, TextAttachment):

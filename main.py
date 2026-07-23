@@ -242,8 +242,8 @@ def main() -> None:
         constants.MAIN_LOG.log(constants.Info("Bot is ready. Syncing commands..."))
         await tree.sync()
         constants.MAIN_LOG.log(constants.Info(f"Logged in as {client.user}"))
-        # set up a schedule to run update_uptime every 5 minutes
-        schedule.every(10).minutes.do(lambda: update_uptime(model, client))
+        # set up a schedule to run update_uptime every hour
+        schedule.every(1).hour.do(lambda: update_uptime(model, client))
         await update_uptime(model, client)
 
     # on join guild
