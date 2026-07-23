@@ -206,7 +206,7 @@ class ChatCompletions(classes.Model):
         """Check if the API is healthy by sending a simple request."""
         try:
             response = requests.get(self.uptime_url, timeout=5)
-            return response.json()["status"] == "up"
+            return float(response.json()["balanceRemaining"]) > 0
         except Exception as e:
             constants.REMOTE_LOG.log(Error(f"Health check failed: {e}"))
             return False
