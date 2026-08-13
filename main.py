@@ -364,7 +364,7 @@ def main() -> None:
                     e
                 )
                 await message.channel.send(
-                    "I unfortunately encountered an error while trying to respond :(",
+                    f"an oopsies happened, sorry! here's the nerd details: ({e})",
                     reference=(
                         message
                         if not isinstance(message.channel, discord.DMChannel)
