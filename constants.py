@@ -29,7 +29,7 @@ OLLAMA_LOG = LogNode("OLLAMA", log_file=LOG_FILE, print_to_console=True, asynchr
 REMOTE_LOG = LogNode("REMOTE", log_file=LOG_FILE, print_to_console=True, asynchronous=True)
 
 OLLAMA_MODEL_NAME = "deepseek-r1:8b"
-REMOTE_MODEL_NAME = "google/gemini-3.5-flash"
+REMOTE_MODEL_NAME = "google/gemini-3.7-flash"
 
 REMOTE_TIMEOUT_SECONDS = 600  # 10 minutes, some AI models take a while to respond
 
